@@ -23,15 +23,32 @@ class MLS_Sitemap {
 	}
 
 	public function register_native_provider() {
-		if ( ! function_exists( 'wp_sitemaps_get_server' ) || ! class_exists( 'WP_Sitemaps_Provider' ) ) {
-			return; // wp_sitemaps desactivado: se usa el XML propio de MLS_SEO.
+		// Se comprueban las funciones EXACTAS que se van a usar (no una
+		// aproximación): en sitios con Yoast/RankMath el sitemap nativo suele
+		// estar desactivado y `wp_sitemaps_add_provider()` puede no existir.
+		if ( ! function_exists( 'wp_sitemaps_add_provider' ) || ! function_exists( 'wp_sitemaps_get_max_urls' ) ) {
+			return; // Sin sitemap nativo: se usa el XML propio de MLS_SEO.
 		}
-		if ( ! apply_filters( 'mls_use_native_sitemaps', true ) ) {
+		if ( ! apply_filters( 'wp_sitemaps_enabled', true ) || ! apply_filters( 'mls_use_native_sitemaps', true ) ) {
 			return;
 		}
 
-		require_once MLS_PLUGIN_DIR . 'includes/class-mls-sitemap-provider.php';
-		wp_sitemaps_add_provider( 'mls_translations', new MLS_Sitemap_Provider() );
+		try {
+			// WordPress carga la clase base en diferido; si un plugin de SEO
+			// desactivó los sitemaps, hay que cargarla a mano.
+			if ( ! class_exists( 'WP_Sitemaps_Provider' ) ) {
+				$base = ABSPATH . WPINC . '/sitemaps/class-wp-sitemaps-provider.php';
+				if ( ! is_readable( $base ) ) {
+					return;
+				}
+				require_once $base;
+			}
+
+			require_once MLS_PLUGIN_DIR . 'includes/class-mls-sitemap-provider.php';
+			wp_sitemaps_add_provider( 'mls_translations', new MLS_Sitemap_Provider() );
+		} catch ( \Throwable $e ) {
+			mls_debug_log( 'Sitemap nativo no disponible: ' . $e->getMessage(), true );
+		}
 	}
 
 	/**

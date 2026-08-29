@@ -4,7 +4,7 @@ Tags: traducción, multilenguaje, seo, hreflang, google translate
 Requires at least: 5.8
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 3.0.0
+Stable tag: 3.0.1
 License: GPLv2 or later
 
 Traduce automáticamente tu contenido con la API de Google Cloud Translation, publícalo en dominio.com/{idioma}/ y sigue buenas prácticas de SEO multilenguaje.
@@ -49,6 +49,11 @@ Este plugin:
 * La API de Google Cloud Translation es de pago por volumen de caracteres; revisa la cuota y el costo en tu consola de Google Cloud.
 
 == Changelog ==
+
+= 3.0.1 =
+* Guarda contra doble carga: si hay dos copias del plugin instaladas (carpetas distintas), la segunda se detiene en silencio en vez de provocar un fatal por redeclaración, y se muestra un aviso en el escritorio.
+* Sitemap nativo: se comprueba `wp_sitemaps_add_provider()` (la función exacta que se usa) antes de llamarla, y se envuelve en try/catch — en sitios con Yoast/Rank Math o con los sitemaps del core deshabilitados ya no hay fatal; se usa el XML propio por idioma.
+* El XML propio por idioma se añade al índice de sitemaps de Yoast (`wpseo_sitemap_index`) cuando Yoast está activo.
 
 = 3.0.0 =
 

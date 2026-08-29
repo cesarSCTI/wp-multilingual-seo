@@ -3,7 +3,7 @@
  * Plugin Name:       Multilingual SEO Translator (Google API)
  * Plugin URI:        https://example.com
  * Description:       Traduce automáticamente tus contenidos usando la API de Google Cloud Translation, genera URLs por idioma (dominio.com/en/, dominio.com/fr/...), redirige visitantes según el idioma del navegador y sigue buenas prácticas de SEO multilenguaje (hreflang, canonical, sitemap por idioma).
- * Version:           3.0.0
+ * Version:           3.0.1
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            Tu Sitio
@@ -16,7 +16,23 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Salir si se accede directamente.
 }
 
-define( 'MLS_VERSION', '3.0.0' );
+/**
+ * Guarda contra doble carga: si otra copia del plugin (otra carpeta, una
+ * versión anterior con distinto slug de directorio...) ya se cargó en esta
+ * petición, esta se detiene en silencio en lugar de provocar un fatal por
+ * redeclaración de funciones/clases.
+ */
+if ( defined( 'MLS_VERSION' ) ) {
+	if ( is_admin() && ! defined( 'MLS_DUPLICATE_NOTICE' ) ) {
+		define( 'MLS_DUPLICATE_NOTICE', 1 );
+		add_action( 'admin_notices', function () {
+			echo '<div class="notice notice-error"><p><strong>Multilingual SEO Translator:</strong> hay dos copias del plugin instaladas. Desactiva y borra la que sobra (deja solo una carpeta en <code>wp-content/plugins/</code>).</p></div>';
+		} );
+	}
+	return;
+}
+
+define( 'MLS_VERSION', '3.0.1' );
 define( 'MLS_DB_VERSION', '2.4.0' );
 define( 'MLS_PLUGIN_FILE', __FILE__ );
 define( 'MLS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );

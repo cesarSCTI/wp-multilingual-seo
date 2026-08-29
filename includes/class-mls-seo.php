@@ -35,22 +35,46 @@ class MLS_SEO {
 		// <html lang="en"> correcto en vez del idioma original del sitio.
 		add_filter( 'language_attributes', array( $this, 'filter_language_attributes' ) );
 
-		// Sitemap XML propio: solo como respaldo cuando el sitemap NATIVO de
-		// WordPress (WP_Sitemaps) no está disponible o se desactivó. Si el
-		// nativo está activo, MLS_Sitemap_Provider añade las URLs traducidas
-		// ahí y el core ya referencia su sitemap en robots.txt.
-		if ( ! $this->native_sitemaps_active() ) {
-			add_action( 'init', array( $this, 'register_sitemap_rewrite' ) );
-			add_filter( 'query_vars', array( $this, 'register_sitemap_query_var' ) );
-			add_action( 'template_redirect', array( $this, 'maybe_render_sitemap' ) );
-			add_filter( 'robots_txt', array( $this, 'add_sitemaps_to_robots' ), 10, 1 );
-		}
+		// Sitemap XML propio `/mls-sitemap-{lang}.xml`. La ruta y el render se
+		// registran SIEMPRE (son inocuos si además está el nativo); solo las
+		// piezas que podrían duplicar algo (robots.txt) se deciden en runtime,
+		// cuando ya sabemos si Yoast/Rank Math desactivaron el sitemap nativo.
+		add_action( 'init', array( $this, 'register_sitemap_rewrite' ) );
+		add_filter( 'query_vars', array( $this, 'register_sitemap_query_var' ) );
+		add_action( 'template_redirect', array( $this, 'maybe_render_sitemap' ) );
+		add_filter( 'robots_txt', array( $this, 'add_sitemaps_to_robots' ), 10, 1 );
+		add_filter( 'wpseo_sitemap_index', array( $this, 'add_to_yoast_sitemap_index' ) );
 	}
 
+	/**
+	 * ¿Está activo el sitemap NATIVO de WordPress (WP_Sitemaps)? Se evalúa en
+	 * runtime, nunca en el constructor: Yoast/Rank Math registran su filtro
+	 * `wp_sitemaps_enabled` durante `plugins_loaded`, quizá después que este
+	 * plugin.
+	 */
 	private function native_sitemaps_active() {
-		return function_exists( 'wp_sitemaps_get_server' )
+		return function_exists( 'wp_sitemaps_add_provider' )
 			&& (bool) apply_filters( 'mls_use_native_sitemaps', true )
 			&& (bool) apply_filters( 'wp_sitemaps_enabled', true );
+	}
+
+	/**
+	 * Añade `/mls-sitemap-{lang}.xml` al índice de sitemaps de Yoast.
+	 *
+	 * @param string $xml
+	 * @return string
+	 */
+	public function add_to_yoast_sitemap_index( $xml ) {
+		foreach ( MLS_Language_Registry::targets() as $code => $lang ) {
+			if ( ! MLS_DB::lang_has_translations( $code ) ) {
+				continue;
+			}
+			$xml .= "\t<sitemap>\n";
+			$xml .= "\t\t<loc>" . esc_url( home_url( '/mls-sitemap-' . $code . '.xml' ) ) . "</loc>\n";
+			$xml .= "\t\t<lastmod>" . esc_html( gmdate( 'c' ) ) . "</lastmod>\n";
+			$xml .= "\t</sitemap>\n";
+		}
+		return $xml;
 	}
 
 	/**
@@ -297,13 +321,17 @@ class MLS_SEO {
 	}
 
 	public function add_sitemaps_to_robots( $output ) {
-		$settings = mls_get_settings();
-		foreach ( (array) $settings['target_langs'] as $lang ) {
-			$lang = sanitize_key( $lang );
-			if ( ! $lang || ! MLS_DB::lang_has_translations( $lang ) ) {
+		// Si el sitemap nativo está activo, ya se añade allí; si Yoast maneja
+		// el sitemap, lo referencia él. Solo se añade a robots.txt cuando este
+		// XML propio es la única fuente.
+		if ( $this->native_sitemaps_active() || $this->has_active_seo_plugin() ) {
+			return $output;
+		}
+		foreach ( MLS_Language_Registry::targets() as $code => $lang ) {
+			if ( ! MLS_DB::lang_has_translations( $code ) ) {
 				continue;
 			}
-			$output .= 'Sitemap: ' . home_url( '/mls-sitemap-' . $lang . '.xml' ) . "\n";
+			$output .= 'Sitemap: ' . home_url( '/mls-sitemap-' . $code . '.xml' ) . "\n";
 		}
 		return $output;
 	}

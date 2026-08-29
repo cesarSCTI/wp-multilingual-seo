@@ -3,7 +3,7 @@
  * Plugin Name:       Multilingual SEO Translator (Google API)
  * Plugin URI:        https://example.com
  * Description:       Traduce automáticamente tus contenidos usando la API de Google Cloud Translation, genera URLs por idioma (dominio.com/en/, dominio.com/fr/...), redirige visitantes según el idioma del navegador y sigue buenas prácticas de SEO multilenguaje (hreflang, canonical, sitemap por idioma).
- * Version:           3.0.1
+ * Version:           3.0.2
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            Tu Sitio
@@ -32,7 +32,7 @@ if ( defined( 'MLS_VERSION' ) ) {
 	return;
 }
 
-define( 'MLS_VERSION', '3.0.1' );
+define( 'MLS_VERSION', '3.0.2' );
 define( 'MLS_DB_VERSION', '2.4.0' );
 define( 'MLS_PLUGIN_FILE', __FILE__ );
 define( 'MLS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
@@ -189,6 +189,23 @@ function mls_purge_translation_caches( $post_id, $lang ) {
 	}
 
 	clean_post_cache( $post_id );
+
+	// Un documento de Elementor (cabecera, pie, plantilla del Theme Builder)
+	// afecta a MUCHAS páginas del idioma; no se puede purgar por URL concreta.
+	// En ese caso -- y solo entonces, no en cada guardado normal -- se purga
+	// la caché de página de LiteSpeed. Es una operación poco frecuente
+	// (las plantillas se traducen una vez). Filtrable.
+	if (
+		class_exists( 'MLS_Content_Resolver' )
+		&& MLS_Content_Resolver::is_elementor_document( $post_id )
+		&& apply_filters( 'mls_purge_page_cache_on_template_translation', true, $post_id )
+	) {
+		do_action( 'litespeed_purge_all' );
+		if ( class_exists( 'MLS_Elementor_Adapter' ) ) {
+			MLS_Elementor_Adapter::clear_elementor_render_cache( true );
+		}
+		return;
+	}
 
 	$urls = array_filter( array_unique( array(
 		get_permalink( $post_id ),

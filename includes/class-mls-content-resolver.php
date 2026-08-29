@@ -18,6 +18,37 @@ class MLS_Content_Resolver {
 	const BUILDER_CLASSIC   = 'classic';
 
 	/**
+	 * Tipos de post que Elementor usa para sus "documentos" (cabecera, pie,
+	 * plantillas del Theme Builder, popups, landing pages...). Filtrable.
+	 *
+	 * @return string[]
+	 */
+	public static function elementor_document_types() {
+		return (array) apply_filters( 'mls_elementor_document_types', array(
+			'elementor_library',
+			'e-landing-page',
+			'elementor-hf',        // Elementor Header & Footer Builder (plugin gratuito)
+			'elementor_font',
+		) );
+	}
+
+	/**
+	 * ¿Es este post un documento de Elementor (aunque su tipo no sea público
+	 * ni esté en la lista de tipos traducibles)?
+	 *
+	 * @param int $post_id
+	 * @return bool
+	 */
+	public static function is_elementor_document( $post_id ) {
+		if ( ! class_exists( 'MLS_Elementor_Adapter' ) || ! MLS_Elementor_Adapter::is_elementor_post( $post_id ) ) {
+			return false;
+		}
+		$type = get_post_type( $post_id );
+		return in_array( $type, self::elementor_document_types(), true )
+			|| ! empty( get_post_meta( $post_id, '_elementor_template_type', true ) );
+	}
+
+	/**
 	 * @param int $post_id
 	 * @return string 'elementor' | 'gutenberg' | 'classic'
 	 */

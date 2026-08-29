@@ -91,13 +91,14 @@ class MLS_Elementor_Adapter {
 	 * idioma. No es un flush global de todo el sitio: apunta a la propia
 	 * caché de archivos de Elementor.
 	 */
-	public static function clear_elementor_render_cache() {
+	public static function clear_elementor_render_cache( $force = false ) {
 		// Desactivado por defecto: `files_manager->clear_cache()` regenera el
 		// CSS de TODO el sitio, lo que contradice el aislamiento del plugin.
 		// El aislamiento del Element Cache por idioma (MLS_Elementor_Cache) ya
 		// impide que un render EN se sirva en la URL ES. Quien de verdad lo
-		// necesite puede reactivarlo con este filtro.
-		if ( ! apply_filters( 'mls_clear_elementor_cache_on_save', false ) ) {
+		// necesite puede reactivarlo con este filtro. `$force` lo activa para
+		// casos puntuales (traducción de una plantilla del Theme Builder).
+		if ( ! $force && ! apply_filters( 'mls_clear_elementor_cache_on_save', false ) ) {
 			return;
 		}
 		if ( ! class_exists( '\Elementor\Plugin' ) ) {

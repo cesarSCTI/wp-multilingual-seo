@@ -4,7 +4,7 @@ Tags: traducción, multilenguaje, seo, hreflang, google translate
 Requires at least: 5.8
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 3.0.1
+Stable tag: 3.0.2
 License: GPLv2 or later
 
 Traduce automáticamente tu contenido con la API de Google Cloud Translation, publícalo en dominio.com/{idioma}/ y sigue buenas prácticas de SEO multilenguaje.
@@ -49,6 +49,13 @@ Este plugin:
 * La API de Google Cloud Translation es de pago por volumen de caracteres; revisa la cuota y el costo en tu consola de Google Cloud.
 
 == Changelog ==
+
+= 3.0.2 =
+* **Render de Elementor reescrito.** En vez de depender del filtro `elementor/frontend/builder_content_data` (poco fiable según la versión de Elementor), ahora se intercepta `get_post_metadata` para `_elementor_data` y se devuelve el JSON ya traducido — la misma técnica de WPML/Polylang. Funciona con página, entrada, **cabecera, pie, plantillas del Theme Builder y popups**, y respeta la caché de Elementor. El `_elementor_data` original nunca se modifica.
+* **Cabecera y pie traducibles.** Los documentos de Elementor (`elementor_library`, plantillas del Theme Builder...) ahora aparecen en "Traducciones" y se traducen aunque su tipo no sea público.
+* Al traducir una plantilla del Theme Builder se purga la caché de página de LiteSpeed y el render de Elementor (operación poco frecuente; filtrable con `mls_purge_page_cache_on_template_translation`).
+* La barra de depuración muestra ahora cuántos documentos/unidades de Elementor se aplicaron realmente en la petición.
+* El filtro `mls_elementor_document_types` permite añadir tipos de documento de Elementor de terceros.
 
 = 3.0.1 =
 * Guarda contra doble carga: si hay dos copias del plugin instaladas (carpetas distintas), la segunda se detiene en silencio en vez de provocar un fatal por redeclaración, y se muestra un aviso en el escritorio.

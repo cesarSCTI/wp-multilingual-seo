@@ -275,8 +275,13 @@ class MLS_Admin {
 		$settings = mls_get_settings();
 		$targets  = array_filter( array_map( 'sanitize_key', (array) $settings['target_langs'] ) );
 
+		$types = array_values( array_unique( array_merge(
+			(array) $settings['post_types'],
+			array_filter( MLS_Content_Resolver::elementor_document_types(), 'post_type_exists' )
+		) ) );
+
 		$posts = get_posts( array(
-			'post_type'      => (array) $settings['post_types'],
+			'post_type'      => $types,
 			'post_status'    => 'publish',
 			'posts_per_page' => -1,
 			'fields'         => 'ids',
@@ -972,7 +977,14 @@ class MLS_Admin {
 		$lang_filter = isset( $_GET['lang'] ) ? sanitize_key( $_GET['lang'] ) : '';
 		$type_filter = isset( $_GET['content_type'] ) ? sanitize_key( $_GET['content_type'] ) : '';
 		$query_targets = ( $lang_filter && in_array( $lang_filter, $targets, true ) ) ? array( $lang_filter ) : $targets;
-		$post_types = $type_filter && in_array( $type_filter, (array) $settings['post_types'], true ) ? array( $type_filter ) : (array) $settings['post_types'];
+
+		// Además de los tipos configurados, se listan los documentos de
+		// Elementor (cabecera, pie, plantillas del Theme Builder) que existan,
+		// para poder traducir el header/footer.
+		$configured_types = (array) $settings['post_types'];
+		$elementor_types  = array_values( array_filter( MLS_Content_Resolver::elementor_document_types(), 'post_type_exists' ) );
+		$all_types        = array_values( array_unique( array_merge( $configured_types, $elementor_types ) ) );
+		$post_types       = ( $type_filter && in_array( $type_filter, $all_types, true ) ) ? array( $type_filter ) : $all_types;
 
 		$q = new WP_Query( array(
 			'post_type'      => $post_types,

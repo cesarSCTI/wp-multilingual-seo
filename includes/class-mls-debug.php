@@ -127,7 +127,11 @@ class MLS_Debug {
 			<span>Post: <?php echo esc_html( $data['post_id'] ? $data['post_id'] : '—' ); ?></span>
 			<span>Builder: <?php echo esc_html( $data['builder'] ? $data['builder'] : '—' ); ?></span>
 			<span>Data: <?php echo esc_html( $data['builder_data_used'] ); ?></span>
-			<span>Interception: <?php echo esc_html( ( 'elementor' === $data['builder'] && ! $data['is_source'] && false !== strpos( $data['builder_data_used'], 'translated units' ) ) ? 'YES' : 'NO' ); ?></span>
+			<?php
+			$applied = class_exists( 'MLS_Elementor_Renderer' ) ? MLS_Elementor_Renderer::$applied : array();
+			$total   = array_sum( $applied );
+			?>
+			<span>Elementor aplicado: <strong style="color:<?php echo $total > 0 ? '#68de7c' : '#e0605e'; ?>;"><?php echo $applied ? esc_html( count( $applied ) . ' docs / ' . $total . ' unidades' ) : ( $data['is_source'] ? 'n/a (source)' : 'NADA' ); ?></strong></span>
 		</div>
 		<?php
 	}

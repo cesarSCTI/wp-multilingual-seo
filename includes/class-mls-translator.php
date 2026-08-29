@@ -42,7 +42,12 @@ class MLS_Translator {
 
 		$settings = mls_get_settings();
 
-		if ( ! in_array( $post->post_type, (array) $settings['post_types'], true ) ) {
+		// Se traduce si el tipo está en la lista configurada O si es un
+		// documento de Elementor (cabecera, pie, plantilla del Theme Builder,
+		// popup): esos casi nunca son tipos "públicos" pero SÍ hay que
+		// traducirlos para que /en/ no muestre el header en español.
+		$is_elementor_doc = MLS_Content_Resolver::is_elementor_document( $post_id );
+		if ( ! $is_elementor_doc && ! in_array( $post->post_type, (array) $settings['post_types'], true ) ) {
 			return;
 		}
 

@@ -54,6 +54,7 @@ Este plugin:
 * Guarda contra doble carga: si hay dos copias del plugin instaladas (carpetas distintas), la segunda se detiene en silencio en vez de provocar un fatal por redeclaración, y se muestra un aviso en el escritorio.
 * Sitemap nativo: se comprueba `wp_sitemaps_add_provider()` (la función exacta que se usa) antes de llamarla, y se envuelve en try/catch — en sitios con Yoast/Rank Math o con los sitemaps del core deshabilitados ya no hay fatal; se usa el XML propio por idioma.
 * El XML propio por idioma se añade al índice de sitemaps de Yoast (`wpseo_sitemap_index`) cuando Yoast está activo.
+* Elementor: la extracción de texto era demasiado restrictiva (solo una lista blanca de claves), por lo que en el frontend traducido solo cambiaban los títulos. Ahora también se traduce cualquier valor que sea claramente una frase (contiene espacios o puntuación) en una clave no técnica, cubriendo widgets de terceros y claves poco comunes. Requiere re-traducir las páginas ya traducidas con versiones anteriores.
 
 = 3.0.0 =
 

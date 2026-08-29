@@ -64,8 +64,11 @@ class MLS_Elementor_Adapter {
 	private static $blacklist_keys = array(
 		'_id', 'id', 'elType', 'widgetType', 'isInner',
 		'url', 'link', 'image', 'background_image', 'icon', 'selected_icon',
-		'css_classes', 'custom_css', 'attachment_id', 'source', 'hash',
-		'query', 'dynamic', '__dynamic__', 'css_filter',
+		'css_classes', '_css_classes', 'custom_css', 'attachment_id', 'source', 'hash',
+		'query', 'dynamic', '__dynamic__', 'css_filter', 'shortcode',
+		'element_id', '_element_id', 'css_id', 'anchor', 'link_to', 'redirect_url',
+		'form_id', 'field_type', 'field_value', 'input_size', 'button_type',
+		'__globals__', 'defaultEditingMode',
 	);
 
 	/**
@@ -228,7 +231,14 @@ class MLS_Elementor_Adapter {
 			$current_path = $path . '.' . $key;
 
 			if ( is_string( $value ) ) {
-				if ( self::is_translatable_key( $key ) && self::looks_like_text( $value ) ) {
+				// Se traduce si (a) la clave está en la whitelist y el valor
+				// parece texto, o (b) el valor parece claramente una frase
+				// humana aunque la clave no esté en la whitelist (cubre
+				// widgets de terceros y claves poco comunes).
+				$translate = ( self::is_translatable_key( $key ) && self::looks_like_text( $value ) )
+					|| self::looks_like_phrase( $key, $value );
+
+				if ( $translate ) {
 					$unit_id = $element_id ? $element_id . '.' . $key : $current_path;
 					$units[] = array(
 						'unit_id' => $unit_id,
@@ -309,6 +319,53 @@ class MLS_Elementor_Adapter {
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * Sufijos de clave claramente TÉCNICOS: si la clave termina así, su
+	 * valor no se traduce aunque parezca una frase.
+	 */
+	private static $technical_suffixes = array(
+		'_id', '_key', '_type', '_size', '_width', '_height', '_align', '_position',
+		'_color', '_bg', '_background', '_url', '_link', '_class', '_classes',
+		'_animation', '_delay', '_duration', '_icon', '_image', '_src', '_target',
+		'_tag', '_zoom', '_lat', '_lng', '_order', '_ratio', '_opacity', '_offset',
+		'_gap', '_radius', '_border', '_shadow', '_filter', '_selector', '_hover',
+		'_status', '_state', '_mode', '_layout', '_style', '_effect', '_repeat',
+		'_direction', '_blend', '_clip', '_unit', '_value', '_name_type',
+	);
+
+	/**
+	 * ¿El VALOR parece una frase humana real? (clave no técnica + contiene
+	 * espacios o termina en puntuación de frase + tiene letras).
+	 *
+	 * @param string $key
+	 * @param string $value
+	 * @return bool
+	 */
+	private static function looks_like_phrase( $key, $value ) {
+		if ( in_array( $key, self::keys( 'blacklist' ), true ) ) {
+			return false;
+		}
+		$lk = strtolower( (string) $key );
+		foreach ( self::$technical_suffixes as $suffix ) {
+			if ( strlen( $lk ) >= strlen( $suffix ) && substr( $lk, -strlen( $suffix ) ) === $suffix ) {
+				return false;
+			}
+		}
+
+		$t = trim( wp_strip_all_tags( (string) $value ) );
+		if ( '' === $t || strlen( $t ) > 8000 ) {
+			return false;
+		}
+		if ( preg_match( '#^(https?://|/|\#|\[|\{|globals://|data:|rgba?\(|var\(|\d)#i', $t ) ) {
+			return false; // URL, ruta, shortcode, JSON, color, número...
+		}
+		if ( ! preg_match( '/\p{L}{2,}/u', $t ) ) {
+			return false; // Sin al menos una "palabra" con 2+ letras.
+		}
+		// Frase: tiene espacio interno, o termina en signo de puntuación.
+		return (bool) preg_match( '/\S\s+\S/u', $t ) || (bool) preg_match( '/[.!?…:,;]$/u', $t );
 	}
 
 	/**

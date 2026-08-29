@@ -1,0 +1,1 @@
+# wp-multilingual-seo

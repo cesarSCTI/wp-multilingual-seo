@@ -1,0 +1,21 @@
+.mls-language-switcher {
+	display: inline-block;
+}
+
+.mls-language-switcher-select {
+	padding: 4px 8px;
+	border: 1px solid #ddd;
+	border-radius: 4px;
+	font-size: 13px;
+	background: #fff;
+	cursor: pointer;
+}
+
+.screen-reader-text {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(1px, 1px, 1px, 1px);
+	white-space: nowrap;
+}

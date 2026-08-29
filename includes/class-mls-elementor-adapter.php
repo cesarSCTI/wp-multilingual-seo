@@ -89,6 +89,14 @@ class MLS_Elementor_Adapter {
 	 * caché de archivos de Elementor.
 	 */
 	public static function clear_elementor_render_cache() {
+		// Desactivado por defecto: `files_manager->clear_cache()` regenera el
+		// CSS de TODO el sitio, lo que contradice el aislamiento del plugin.
+		// El aislamiento del Element Cache por idioma (MLS_Elementor_Cache) ya
+		// impide que un render EN se sirva en la URL ES. Quien de verdad lo
+		// necesite puede reactivarlo con este filtro.
+		if ( ! apply_filters( 'mls_clear_elementor_cache_on_save', false ) ) {
+			return;
+		}
 		if ( ! class_exists( '\Elementor\Plugin' ) ) {
 			return;
 		}
@@ -214,7 +222,7 @@ class MLS_Elementor_Adapter {
 		}
 
 		foreach ( $node as $key => $value ) {
-			if ( in_array( $key, self::$blacklist_keys, true ) ) {
+			if ( in_array( $key, self::keys( 'blacklist' ), true ) ) {
 				continue; // Se salta tanto si es texto suelto como si es un array anidado (ej. selected_icon.value).
 			}
 			$current_path = $path . '.' . $key;
@@ -247,7 +255,7 @@ class MLS_Elementor_Adapter {
 		}
 
 		foreach ( $node as $key => &$value ) {
-			if ( in_array( $key, self::$blacklist_keys, true ) ) {
+			if ( in_array( $key, self::keys( 'blacklist' ), true ) ) {
 				continue;
 			}
 			$current_path = $path . '.' . $key;
@@ -266,14 +274,36 @@ class MLS_Elementor_Adapter {
 		unset( $value );
 	}
 
+	/**
+	 * Listas efectivas de claves, filtrables para dar soporte a widgets de
+	 * terceros sin tocar el plugin:
+	 *   - mls_elementor_text_keys      (claves exactas que SÍ son texto)
+	 *   - mls_elementor_text_suffixes  (sufijos que marcan texto)
+	 *   - mls_elementor_blacklist_keys (claves que NUNCA se traducen)
+	 *
+	 * @param string $which
+	 * @return string[]
+	 */
+	private static function keys( $which ) {
+		switch ( $which ) {
+			case 'text':
+				return (array) apply_filters( 'mls_elementor_text_keys', self::$text_keys );
+			case 'suffixes':
+				return (array) apply_filters( 'mls_elementor_text_suffixes', self::$text_suffixes );
+			case 'blacklist':
+			default:
+				return (array) apply_filters( 'mls_elementor_blacklist_keys', self::$blacklist_keys );
+		}
+	}
+
 	private static function is_translatable_key( $key ) {
-		if ( in_array( $key, self::$blacklist_keys, true ) ) {
+		if ( in_array( $key, self::keys( 'blacklist' ), true ) ) {
 			return false;
 		}
-		if ( in_array( $key, self::$text_keys, true ) ) {
+		if ( in_array( $key, self::keys( 'text' ), true ) ) {
 			return true;
 		}
-		foreach ( self::$text_suffixes as $suffix ) {
+		foreach ( self::keys( 'suffixes' ) as $suffix ) {
 			if ( strlen( $key ) > strlen( $suffix ) && substr( $key, -strlen( $suffix ) ) === $suffix ) {
 				return true;
 			}

@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  static:
+    name: Lint · PHPCS · PHPStan
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php: [ '7.4', '8.3' ]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+          tools: composer:v2
+
+      - name: PHP syntax check
+        run: find . -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 -P4 php -l
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: PHPCS (WordPress Coding Standards)
+        run: composer phpcs
+
+      - name: PHPStan
+        run: composer phpstan
+
+  unit:
+    name: PHPUnit (unit, sin WordPress)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+          tools: composer:v2
+
+      - run: composer install --no-interaction --no-progress --prefer-dist
+      - run: composer test

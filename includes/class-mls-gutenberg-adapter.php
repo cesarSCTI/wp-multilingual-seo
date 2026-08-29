@@ -55,7 +55,24 @@ class MLS_Gutenberg_Adapter {
 		foreach ( $blocks as $i => $block ) {
 			$path = $path_prefix . '.' . $i;
 
-			if ( ! empty( $block['innerHTML'] ) && '' !== trim( wp_strip_all_tags( $block['innerHTML'] ) ) ) {
+			// `serialize_blocks()` reconstruye cada bloque a partir de
+			// `innerContent` (array de fragmentos de HTML, con `null` donde va
+			// cada innerBlock), NO de `innerHTML`. Para bloques con hijos
+			// (quote+cite, columns, group...) `innerHTML` es solo un resumen y
+			// escribir ahí la traducción se pierde al reserializar. Extraemos
+			// una unidad por fragmento de texto real de `innerContent`, con una
+			// ruta estable por posición, y así la reinyección es exacta.
+			if ( isset( $block['innerContent'] ) && is_array( $block['innerContent'] ) && count( $block['innerContent'] ) > 0 ) {
+				foreach ( $block['innerContent'] as $j => $chunk ) {
+					if ( is_string( $chunk ) && '' !== trim( wp_strip_all_tags( $chunk ) ) ) {
+						$units[] = array(
+							'path' => $path . '.innerContent.' . $j,
+							'text' => $chunk,
+							'type' => 'html',
+						);
+					}
+				}
+			} elseif ( ! empty( $block['innerHTML'] ) && '' !== trim( wp_strip_all_tags( $block['innerHTML'] ) ) ) {
 				$units[] = array(
 					'path' => $path . '.innerHTML',
 					'text' => $block['innerHTML'],
@@ -87,13 +104,34 @@ class MLS_Gutenberg_Adapter {
 		foreach ( $blocks as $i => &$block ) {
 			$path = $path_prefix . '.' . $i;
 
-			if ( isset( $by_path[ $path . '.innerHTML' ] ) ) {
+			// Fragmentos de innerContent (formato actual): se reinyecta cada uno
+			// en su posición exacta y se recompone innerHTML por consistencia.
+			$content_touched = false;
+			if ( isset( $block['innerContent'] ) && is_array( $block['innerContent'] ) ) {
+				foreach ( $block['innerContent'] as $j => $chunk ) {
+					$chunk_path = $path . '.innerContent.' . $j;
+					if ( is_string( $chunk ) && isset( $by_path[ $chunk_path ] ) && '' !== trim( $by_path[ $chunk_path ] ) ) {
+						$block['innerContent'][ $j ] = $by_path[ $chunk_path ];
+						$content_touched             = true;
+					}
+				}
+				if ( $content_touched ) {
+					$block['innerHTML'] = implode( '', array_filter(
+						$block['innerContent'],
+						static function ( $c ) {
+							return is_string( $c );
+						}
+					) );
+				}
+			}
+
+			// Respaldo para traducciones guardadas con el formato anterior
+			// (una sola unidad `.innerHTML` por bloque hoja).
+			if ( ! $content_touched && isset( $by_path[ $path . '.innerHTML' ] ) ) {
 				$new_html = $by_path[ $path . '.innerHTML' ];
 				if ( '' !== trim( $new_html ) ) {
 					$block['innerHTML'] = $new_html;
-					// innerContent normalmente es [innerHTML] en bloques simples sin
-					// hijos; lo sincronizamos para que serialize_blocks() lo use bien.
-					if ( ! empty( $block['innerContent'] ) && 1 === count( $block['innerContent'] ) ) {
+					if ( ! empty( $block['innerContent'] ) && 1 === count( $block['innerContent'] ) && is_string( $block['innerContent'][0] ) ) {
 						$block['innerContent'] = array( $new_html );
 					}
 				}

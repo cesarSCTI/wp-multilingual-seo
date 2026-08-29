@@ -1,0 +1,22 @@
+# Normaliza los finales de línea: en el repositorio SIEMPRE LF.
+* text=auto eol=lf
+
+*.php   text eol=lf
+*.js    text eol=lf
+*.css   text eol=lf
+*.md    text eol=lf
+*.json  text eol=lf
+*.xml   text eol=lf
+*.yml   text eol=lf
+*.dist  text eol=lf
+*.txt   text eol=lf
+
+# Excluye artefactos del paquete distribuible.
+/tests          export-ignore
+/.github        export-ignore
+/phpcs.xml.dist export-ignore
+/phpstan.neon.dist export-ignore
+/phpunit.xml.dist  export-ignore
+/composer.json  export-ignore
+/.gitattributes export-ignore
+/.gitignore     export-ignore

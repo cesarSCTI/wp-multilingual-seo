@@ -47,7 +47,7 @@ class MLS_Elementor_Renderer {
 		}
 
 		$translation = MLS_DB::get_translation( absint( $post_id ), $lang );
-		if ( ! $translation ) {
+		if ( ! MLS_DB::is_servable( $translation ) ) {
 			// Header/footer/templates sin traducción todavía deben seguir
 			// renderizando completos en el idioma fuente, nunca desaparecer.
 			mls_debug_log( 'Elementor renderer post=' . absint( $post_id ) . ': sin traducción ' . $lang . ', conserva original.' );

@@ -15,29 +15,42 @@ class MLS_SEO {
 	public function __construct() {
 		add_action( 'wp_head', array( $this, 'output_hreflang_tags' ), 5 );
 
-		// Si hay un plugin de SEO activo (Yoast, RankMath, AIOSEO), ese plugin
-		// ya imprime su propio <link rel="canonical">. En vez de duplicarlo,
-		// nos enganchamos a su filtro para que respete el idioma actual.
-		// Si no hay ninguno, quitamos el canonical por defecto de WP core
-		// y ponemos el nuestro.
-		if ( $this->has_active_seo_plugin() ) {
-			add_filter( 'wpseo_canonical', array( $this, 'filter_seo_plugin_canonical' ) );
-			add_filter( 'rank_math/frontend/canonical', array( $this, 'filter_seo_plugin_canonical' ) );
-			add_filter( 'aioseo_canonical_url', array( $this, 'filter_seo_plugin_canonical' ) );
-		} else {
-			remove_action( 'wp_head', 'rel_canonical' );
-			add_action( 'wp_head', array( $this, 'output_canonical_tag' ), 5 );
-		}
+		// Canonical NO invasivo: nunca se quita `rel_canonical` del core ni se
+		// desregistra nada de otros plugins. En una petición sin prefijo de
+		// idioma todos estos filtros son no-ops y el sitio se comporta igual
+		// que sin el plugin. Solo en una URL traducida ajustamos la URL que
+		// el core (o el plugin de SEO) ya iba a imprimir.
+		add_filter( 'get_canonical_url', array( $this, 'filter_core_canonical_url' ), 10, 2 );
+		add_filter( 'wpseo_canonical', array( $this, 'filter_seo_plugin_canonical' ) );
+		add_filter( 'rank_math/frontend/canonical', array( $this, 'filter_seo_plugin_canonical' ) );
+		add_filter( 'aioseo_canonical_url', array( $this, 'filter_seo_plugin_canonical' ) );
+
+		// El core solo imprime canonical en is_singular(); la home traducida
+		// (/en/) también necesita el suyo y no lo cubre ni el core ni este
+		// filtro, así que lo emitimos aparte — y solo en peticiones traducidas.
+		add_action( 'wp_head', array( $this, 'output_front_page_canonical' ), 5 );
 
 		add_action( 'wp_head', array( $this, 'output_meta_description' ), 6 );
 
 		// <html lang="en"> correcto en vez del idioma original del sitio.
 		add_filter( 'language_attributes', array( $this, 'filter_language_attributes' ) );
 
-		add_action( 'init', array( $this, 'register_sitemap_rewrite' ) );
-		add_filter( 'query_vars', array( $this, 'register_sitemap_query_var' ) );
-		add_action( 'template_redirect', array( $this, 'maybe_render_sitemap' ) );
-		add_filter( 'robots_txt', array( $this, 'add_sitemaps_to_robots' ), 10, 1 );
+		// Sitemap XML propio: solo como respaldo cuando el sitemap NATIVO de
+		// WordPress (WP_Sitemaps) no está disponible o se desactivó. Si el
+		// nativo está activo, MLS_Sitemap_Provider añade las URLs traducidas
+		// ahí y el core ya referencia su sitemap en robots.txt.
+		if ( ! $this->native_sitemaps_active() ) {
+			add_action( 'init', array( $this, 'register_sitemap_rewrite' ) );
+			add_filter( 'query_vars', array( $this, 'register_sitemap_query_var' ) );
+			add_action( 'template_redirect', array( $this, 'maybe_render_sitemap' ) );
+			add_filter( 'robots_txt', array( $this, 'add_sitemaps_to_robots' ), 10, 1 );
+		}
+	}
+
+	private function native_sitemaps_active() {
+		return function_exists( 'wp_sitemaps_get_server' )
+			&& (bool) apply_filters( 'mls_use_native_sitemaps', true )
+			&& (bool) apply_filters( 'wp_sitemaps_enabled', true );
 	}
 
 	/**
@@ -97,11 +110,11 @@ class MLS_SEO {
 		if ( ! $post_id ) {
 			return;
 		}
-		$settings = mls_get_settings();
+		$source = MLS_Language_Registry::source();
 
 		printf(
 			'<link rel="alternate" hreflang="%s" href="%s" />' . "\n",
-			esc_attr( $settings['source_lang'] ),
+			esc_attr( $source['hreflang'] ),
 			esc_url( get_permalink( $post_id ) )
 		);
 		printf(
@@ -109,25 +122,24 @@ class MLS_SEO {
 			esc_url( get_permalink( $post_id ) )
 		);
 
-		foreach ( (array) $settings['target_langs'] as $lang ) {
-			$lang = sanitize_key( $lang );
-			if ( ! MLS_DB::get_translation( $post_id, $lang ) ) {
-				continue; // Solo anunciamos idiomas que ya tienen traducción real.
+		foreach ( MLS_Language_Registry::targets() as $code => $lang ) {
+			if ( ! MLS_DB::is_indexable( MLS_DB::get_translation( $post_id, $code ) ) ) {
+				continue; // Solo anunciamos idiomas con una traducción publicada.
 			}
 			printf(
 				'<link rel="alternate" hreflang="%s" href="%s" />' . "\n",
-				esc_attr( $lang ),
-				esc_url( mls_get_translated_url( $post_id, $lang ) )
+				esc_attr( $lang['hreflang'] ),
+				esc_url( mls_get_translated_url( $post_id, $code ) )
 			);
 		}
 	}
 
 	private function output_hreflang_for_home() {
-		$settings = mls_get_settings();
+		$source = MLS_Language_Registry::source();
 
 		printf(
 			'<link rel="alternate" hreflang="%s" href="%s" />' . "\n",
-			esc_attr( $settings['source_lang'] ),
+			esc_attr( $source['hreflang'] ),
 			esc_url( home_url( '/' ) )
 		);
 		printf(
@@ -135,41 +147,56 @@ class MLS_SEO {
 			esc_url( home_url( '/' ) )
 		);
 
-		foreach ( (array) $settings['target_langs'] as $lang ) {
-			$lang = sanitize_key( $lang );
-			if ( ! $lang ) {
-				continue;
+		foreach ( MLS_Language_Registry::targets() as $code => $lang ) {
+			if ( ! MLS_DB::lang_has_translations( $code ) ) {
+				continue; // Coherente con el hreflang de post: solo idiomas con contenido real.
 			}
 			printf(
 				'<link rel="alternate" hreflang="%s" href="%s" />' . "\n",
-				esc_attr( $lang ),
-				esc_url( trailingslashit( home_url( '/' . $lang ) ) )
+				esc_attr( $lang['hreflang'] ),
+				esc_url( MLS_Url::home( $code ) )
 			);
 		}
 	}
 
 	/**
-	 * Canonical que respeta el idioma actual (evita duplicados entre
-	 * dominio.com/mi-post y dominio.com/en/mi-post). Cubre posts/páginas
-	 * y también la home de cada idioma.
+	 * Ajusta la URL canónica que el core ya iba a imprimir (`wp_get_canonical_url()`
+	 * / `rel_canonical`) para que apunte a la versión del idioma actual. En
+	 * peticiones de idioma fuente devuelve el valor sin tocar.
+	 *
+	 * @param string       $canonical_url
+	 * @param WP_Post|null  $post
+	 * @return string
 	 */
-	public function output_canonical_tag() {
-		$settings = mls_get_settings();
-		$lang     = MLS_Language_Context::get_current_language();
+	public function filter_core_canonical_url( $canonical_url, $post ) {
+		if ( MLS_Language_Context::is_source_request() ) {
+			return $canonical_url;
+		}
+		$lang    = MLS_Language_Context::get_current_language();
+		$post_id = $post ? (int) $post->ID : $this->current_post_id();
 
-		if ( is_singular() ) {
-			$post_id = $this->current_post_id();
-			if ( ! $post_id ) {
-				return;
-			}
-			printf( '<link rel="canonical" href="%s" />' . "\n", esc_url( mls_get_translated_url( $post_id, $lang ) ) );
+		return $post_id ? mls_get_translated_url( $post_id, $lang ) : $canonical_url;
+	}
+
+	/**
+	 * Canonical de la home traducida (/en/). Solo se ejecuta en peticiones
+	 * traducidas y solo si ningún plugin de SEO va a imprimir el suyo.
+	 */
+	public function output_front_page_canonical() {
+		if ( MLS_Language_Context::is_source_request() ) {
 			return;
 		}
-
-		if ( is_front_page() || is_home() ) {
-			$url = ( $lang === $settings['source_lang'] ) ? home_url( '/' ) : trailingslashit( home_url( '/' . $lang ) );
-			printf( '<link rel="canonical" href="%s" />' . "\n", esc_url( $url ) );
+		if ( ! is_front_page() && ! is_home() ) {
+			return;
 		}
+		if ( $this->has_active_seo_plugin() ) {
+			return; // Su filtro aioseo/wpseo/rank_math ya lo cubre.
+		}
+		$lang = MLS_Language_Context::get_current_language();
+		printf(
+			'<link rel="canonical" href="%s" />' . "\n",
+			esc_url( trailingslashit( home_url( '/' . $lang ) ) )
+		);
 	}
 
 	/**
@@ -221,14 +248,43 @@ class MLS_SEO {
 			exit;
 		}
 
-		$rows = MLS_DB::get_all_slugs_for_lang( $lang );
+		$rows           = MLS_DB::get_all_slugs_for_lang( $lang );
+		$front_page_id  = ( 'page' === get_option( 'show_on_front' ) ) ? (int) get_option( 'page_on_front' ) : 0;
 
 		header( 'Content-Type: application/xml; charset=UTF-8' );
 		echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
 		echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
 
 		foreach ( $rows as $row ) {
-			$url  = trailingslashit( home_url( '/' . $lang . '/' . $row->post_slug ) );
+			// Solo se indexa una traducción cuyo post de origen esté publicado
+			// y sea públicamente accesible, y cuya propia traducción no haya
+			// fallado. Nunca se listan borradores, privados, protegidos con
+			// contraseña, papelera ni traducciones incompletas.
+			if ( ! MLS_DB::is_indexable( $row ) ) {
+				continue;
+			}
+			$post = get_post( (int) $row->post_id );
+			if ( ! $post || 'publish' !== $post->post_status ) {
+				continue;
+			}
+			if ( '' !== (string) $post->post_password ) {
+				continue;
+			}
+			if ( 'post' !== $post->post_type && 'page' !== $post->post_type ) {
+				$type_obj = get_post_type_object( $post->post_type );
+				if ( ! $type_obj || empty( $type_obj->public ) ) {
+					continue;
+				}
+			}
+
+			// La front page vive en /{lang}/, no en /{lang}/{slug}/.
+			if ( $front_page_id && (int) $row->post_id === $front_page_id ) {
+				$url = trailingslashit( home_url( '/' . $lang ) );
+			} else {
+				$path = ! empty( $row->translated_path ) ? $row->translated_path : $row->post_slug;
+				$url  = trailingslashit( home_url( '/' . $lang . '/' . ltrim( $path, '/' ) ) );
+			}
+
 			$date = mysql2date( 'c', $row->updated_at );
 			echo "\t<url>\n";
 			echo "\t\t<loc>" . esc_url( $url ) . "</loc>\n";
@@ -243,7 +299,10 @@ class MLS_SEO {
 	public function add_sitemaps_to_robots( $output ) {
 		$settings = mls_get_settings();
 		foreach ( (array) $settings['target_langs'] as $lang ) {
-			$lang    = sanitize_key( $lang );
+			$lang = sanitize_key( $lang );
+			if ( ! $lang || ! MLS_DB::lang_has_translations( $lang ) ) {
+				continue;
+			}
 			$output .= 'Sitemap: ' . home_url( '/mls-sitemap-' . $lang . '.xml' ) . "\n";
 		}
 		return $output;
@@ -259,7 +318,7 @@ class MLS_SEO {
 		if ( MLS_Language_Context::is_source_request() ) {
 			return $output;
 		}
-		$lang = esc_attr( MLS_Language_Context::get_current_language() );
+		$lang = esc_attr( MLS_Language_Registry::hreflang( MLS_Language_Context::get_current_language() ) );
 		if ( preg_match( '/\blang="[^"]*"/', $output ) ) {
 			return preg_replace( '/\blang="[^"]*"/', 'lang="' . $lang . '"', $output );
 		}

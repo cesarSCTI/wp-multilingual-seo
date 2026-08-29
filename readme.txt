@@ -4,7 +4,7 @@ Tags: traducción, multilenguaje, seo, hreflang, google translate
 Requires at least: 5.8
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 2.3.0
+Stable tag: 3.0.0
 License: GPLv2 or later
 
 Traduce automáticamente tu contenido con la API de Google Cloud Translation, publícalo en dominio.com/{idioma}/ y sigue buenas prácticas de SEO multilenguaje.
@@ -49,6 +49,53 @@ Este plugin:
 * La API de Google Cloud Translation es de pago por volumen de caracteres; revisa la cuota y el costo en tu consola de Google Cloud.
 
 == Changelog ==
+
+= 3.0.0 =
+
+Reescritura profunda alrededor de un principio: **con el plugin activo y sin
+prefijo de idioma en la URL, el sitio se comporta igual que sin instalarlo.**
+Toda la funcionalidad multilenguaje vive bajo URLs `/{idioma}/` y en tablas
+propias del plugin.
+
+**Contrato de no intervención**
+* Se elimina toda purga global de cachés de terceros (opción `elementor_element_cache_unique_id`, caché global de Elementor, `litespeed_purge_all`). El aislamiento del Element Cache por idioma se mantiene con el filtro público de Elementor.
+* Nunca se quita `rel_canonical` del core; el canonical por idioma se aplica con el filtro `get_canonical_url` y los de Yoast/Rank Math/AIOSEO.
+* `before_delete_post` limpia las filas propias al borrar contenido.
+* Nueva opción "Borrar datos al desinstalar" (desactivada por defecto): desinstalar ya no destruye las traducciones.
+* La API key de Google viaja en cabecera (`X-goog-api-key`), no en el query string.
+
+**Núcleo, router y URLs**
+* Registro normalizado de idiomas (`MLS_Language_Registry`): código URL ↔ locale ↔ hreflang; variantes regionales vía filtro `mls_languages`.
+* `switch_to_locale()` en el frontend traducido: los textos `.mo`/`.json` del tema y los plugins salen en el idioma de la URL (nunca en admin/REST/AJAX/cron).
+* Router tipado por recurso (home, paginación, búsqueda, feeds, contenido) en vez del catch-all `/{idioma}/(.+)`.
+* Rutas jerárquicas: `translated_path` completo; `/en/seccion/subpagina/` funciona y se recalcula al cambiar el slug del padre.
+* Enlaces internos localizados: permalinks, `term_link`, menús (URL y etiqueta), paginación y enlaces incrustados en el contenido.
+* Una URL `/{idioma}/` sin traducción publicada devuelve 404 (nunca sirve el original mezclado).
+
+**Cola, estados y proveedor**
+* Estados: `pending → translating → published`, más `manual`, `failed`, `outdated`. Una traducción automática incompleta NUNCA se publica; reintentos con backoff (60s/5m/15m, máx 3). Action Scheduler si está disponible; sin `spawn_cron()` por guardado.
+* Locks por post+idioma contra traducciones simultáneas.
+* Proveedor intercambiable (`mls_translation_provider`); lotes divididos por segmentos Y por caracteres; HTML y texto plano separados.
+
+**Adaptadores**
+* Clásico: parseo DOM — solo nodos de texto y atributos seguros (`alt`, `title`, `aria-label`, `placeholder`); respeta `translate="no"` y `.notranslate`.
+* Gutenberg: se corrige la pérdida de traducciones en bloques anidados (quote+cite, columns…) y se valida el resultado con `parse_blocks()`.
+* Elementor: listas de claves de texto filtrables (`mls_elementor_text_keys`, `mls_elementor_text_suffixes`, `mls_elementor_blacklist_keys`); la limpieza de caché de render es opt-in.
+
+**Contenido de un sitio real**
+* Custom fields traducibles (`mls_register_translatable_field()`); `get_post_metadata` se intercepta solo para las claves registradas. `alt` de imágenes de serie.
+* Términos: nombre y descripción, edición manual ("Traducción Multilenguaje → Términos"), archivos enrutados (`/en/category/…`, jerarquías incluidas).
+* Menús: etiquetas traducidas de ítems que apuntan a un post/término traducido.
+* WooCommerce: módulo que se activa solo si WC está presente.
+* API de extensión: `mls_register_translatable_field()`, `mls_register_resource_type()`, acciones `mls_register_translatable_fields` / `mls_register_resource_types` / `mls_translation_saved`.
+
+**SEO**
+* Proveedor nativo `WP_Sitemaps` con subtipo por idioma; el XML propio queda de respaldo.
+* title / meta description / Open Graph / Twitter traducidos (core, Yoast, Rank Math, AIOSEO); `og:locale` y `og:locale:alternate`.
+* hreflang y sitemap listan solo traducciones publicadas y contenido de origen público.
+
+**Calidad**
+* `composer.json`, PHPCS (WPCS), PHPStan (nivel 5), PHPUnit (pruebas unitarias con Brain Monkey), GitHub Actions.
 
 = 2.3.0 =
 * Elementor ya no se traduce interceptando get_post_metadata; se usa el filtro nativo builder_content_data.

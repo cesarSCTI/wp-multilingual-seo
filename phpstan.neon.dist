@@ -1,0 +1,19 @@
+includes:
+	- vendor/szepeviktor/phpstan-wordpress/extension.neon
+
+parameters:
+	level: 5
+	paths:
+		- wp-multilingual-seo-translator.php
+		- includes
+		- uninstall.php
+	scanFiles:
+		- tests/stubs/elementor.php
+	bootstrapFiles:
+		- tests/phpstan-bootstrap.php
+	dynamicConstantNames:
+		- MLS_VERSION
+		- MLS_DB_VERSION
+	ignoreErrors:
+		# Elementor es opcional; sus clases se cargan solo si el plugin está activo.
+		- '#Call to static method .* on an unknown class \\Elementor\\Plugin#'

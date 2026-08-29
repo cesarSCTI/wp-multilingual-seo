@@ -118,8 +118,8 @@ class MLS_Redirect {
 	private function build_redirect_url( $lang ) {
 		if ( is_singular() ) {
 			$post_id = get_queried_object_id();
-			if ( ! MLS_DB::get_translation( $post_id, $lang ) ) {
-				return null; // Mejor no redirigir que mandar a una traducción inexistente.
+			if ( ! MLS_DB::is_servable( MLS_DB::get_translation( $post_id, $lang ) ) ) {
+				return null; // Mejor no redirigir que mandar a una traducción inexistente/incompleta.
 			}
 			return mls_get_translated_url( $post_id, $lang );
 		}

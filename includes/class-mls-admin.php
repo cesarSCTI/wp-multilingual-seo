@@ -214,6 +214,8 @@ class MLS_Admin {
 		$output['auto_redirect']  = ! empty( $input['auto_redirect'] ) ? 1 : 0;
 		$output['ignore_redirect_admins'] = ! empty( $input['ignore_redirect_admins'] ) ? 1 : 0;
 		$output['debug_mode']     = ! empty( $input['debug_mode'] ) ? 1 : 0;
+		$output['delete_data_on_uninstall'] = ! empty( $input['delete_data_on_uninstall'] ) ? 1 : 0;
+		$output['translation_fallback'] = ( isset( $input['translation_fallback'] ) && '404' === $input['translation_fallback'] ) ? '404' : 'source';
 
 		$raw_targets = isset( $input['target_langs'] ) ? $input['target_langs'] : array();
 		$targets = is_array( $raw_targets ) ? $raw_targets : explode( ',', (string) $raw_targets );
@@ -226,9 +228,16 @@ class MLS_Admin {
 		$post_types = isset( $input['post_types'] ) ? (array) $input['post_types'] : array( 'post', 'page' );
 		$output['post_types'] = array_map( 'sanitize_key', $post_types );
 
+		$taxonomies = isset( $input['taxonomies'] ) ? (array) $input['taxonomies'] : array( 'category', 'post_tag' );
+		$output['taxonomies'] = array_values( array_filter( array_map( 'sanitize_key', $taxonomies ) ) );
+
 		// El flush real se aplaza al siguiente 'init' (ver MLS_Rewrite::maybe_flush_rules),
 		// para que use la configuración recién guardada y no la anterior.
 		update_option( 'mls_flush_rewrite_rules', 1 );
+
+		if ( class_exists( 'MLS_Language_Registry' ) ) {
+			MLS_Language_Registry::flush_cache();
+		}
 
 		return $output;
 	}
@@ -280,8 +289,11 @@ class MLS_Admin {
 					continue;
 				}
 				$existing = MLS_DB::get_translation( $post_id, $lang );
-				if ( $existing && ! $force ) {
-					continue; // Ya traducido: solo se incluye si se pide forzar.
+				// "Pendiente" = sin fila, o fila que no está publicada/manual
+				// (pending, translating, failed) o desactualizada.
+				$done = $existing && in_array( (string) $existing->status, array( MLS_DB::STATUS_PUBLISHED, MLS_DB::STATUS_MANUAL ), true ) && ! MLS_DB::is_outdated( $existing );
+				if ( $done && ! $force ) {
+					continue;
 				}
 				$jobs[] = array(
 					'post_id' => $post_id,
@@ -312,9 +324,15 @@ class MLS_Admin {
 			wp_send_json_error( array( 'message' => __( 'Datos incompletos.', 'mls' ) ) );
 		}
 
+		if ( ! MLS_DB::acquire_lock( $post_id, $lang ) ) {
+			wp_send_json_error( array( 'message' => __( 'Esa traducción ya se está procesando.', 'mls' ) ) );
+		}
+		MLS_DB::set_status( $post_id, $lang, MLS_DB::STATUS_TRANSLATING );
 		$result = MLS_Translator::translate_and_save( $post_id, $lang, $force );
+		MLS_DB::release_lock( $post_id, $lang );
 
 		if ( is_wp_error( $result ) ) {
+			MLS_DB::set_status( $post_id, $lang, MLS_DB::STATUS_FAILED, $result->get_error_message() );
 			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
 		}
 
@@ -417,8 +435,8 @@ class MLS_Admin {
 				<div class="mls-editor-header-badges">
 					<span class="mls-badge mls-badge--neutral"><?php echo esc_html( MLS_Content_Resolver::label( $builder ) ); ?></span>
 					<?php if ( $status ) : ?>
-						<span class="mls-badge mls-badge--<?php echo esc_attr( $status ); ?>">
-							<?php echo esc_html( 'manual' === $status ? __( 'Manual', 'mls' ) : __( 'Auto', 'mls' ) ); ?>
+						<span class="mls-badge mls-badge--<?php echo esc_attr( 'manual' === $status ? 'manual' : 'auto' ); ?>">
+							<?php echo esc_html( MLS_DB::status_label( $status ) ); ?>
 						</span>
 					<?php endif; ?>
 					<?php if ( $is_outdated ) : ?>
@@ -720,6 +738,7 @@ class MLS_Admin {
 			'language'         => $lang,
 			'post_title'       => $title,
 			'post_slug'        => $final_slug,
+			'translated_path'  => MLS_Url::compute_path( $post_id, $lang, $final_slug ),
 			'post_excerpt'     => isset( $_POST['post_excerpt'] ) ? sanitize_textarea_field( wp_unslash( $_POST['post_excerpt'] ) ) : '',
 			'meta_title'       => isset( $_POST['meta_title'] ) ? sanitize_text_field( wp_unslash( $_POST['meta_title'] ) ) : '',
 			'meta_description' => isset( $_POST['meta_description'] ) ? sanitize_textarea_field( wp_unslash( $_POST['meta_description'] ) ) : '',
@@ -892,6 +911,10 @@ class MLS_Admin {
 						<div class="mls-card__header"><div><h2><?php esc_html_e( 'Contenido', 'mls' ); ?></h2><p><?php esc_html_e( 'Selecciona qué tipos de contenido forman parte de la capa multilenguaje.', 'mls' ); ?></p></div></div>
 						<div class="mls-card__body"><div class="mls-content-types">
 						<?php foreach ( get_post_types( array( 'public' => true ), 'objects' ) as $pt ) : ?><label class="mls-check-card"><input type="checkbox" name="mls_settings[post_types][]" value="<?php echo esc_attr( $pt->name ); ?>" <?php checked( in_array( $pt->name, (array) $settings['post_types'], true ) ); ?>><span><strong><?php echo esc_html( $pt->labels->name ); ?></strong><small><?php echo esc_html( $pt->name ); ?></small></span></label><?php endforeach; ?>
+						</div>
+						<p class="mls-label" style="margin-top:16px;"><?php esc_html_e( 'Taxonomías (nombre y descripción de términos)', 'mls' ); ?></p>
+						<div class="mls-content-types">
+						<?php foreach ( get_taxonomies( array( 'public' => true ), 'objects' ) as $tx ) : ?><label class="mls-check-card"><input type="checkbox" name="mls_settings[taxonomies][]" value="<?php echo esc_attr( $tx->name ); ?>" <?php checked( in_array( $tx->name, (array) ( isset( $settings['taxonomies'] ) ? $settings['taxonomies'] : array() ), true ) ); ?>><span><strong><?php echo esc_html( $tx->labels->name ); ?></strong><small><?php echo esc_html( $tx->name ); ?></small></span></label><?php endforeach; ?>
 						</div></div>
 					</section>
 
@@ -902,6 +925,13 @@ class MLS_Admin {
 							<label class="mls-toggle-row"><span><strong><?php esc_html_e( 'Redirect por navegador', 'mls' ); ?></strong><small><?php esc_html_e( 'Solo redirige; nunca cambia el idioma dentro de la misma URL.', 'mls' ); ?></small></span><input type="checkbox" name="mls_settings[auto_redirect]" value="1" <?php checked( $settings['auto_redirect'], 1 ); ?>></label>
 							<label class="mls-toggle-row"><span><strong><?php esc_html_e( 'Ignorar administradores', 'mls' ); ?></strong><small><?php esc_html_e( 'Recomendado para probar URLs manualmente.', 'mls' ); ?></small></span><input type="checkbox" name="mls_settings[ignore_redirect_admins]" value="1" <?php checked( $settings['ignore_redirect_admins'], 1 ); ?>></label>
 							<label class="mls-toggle-row"><span><strong><?php esc_html_e( 'Debug', 'mls' ); ?></strong><small><?php esc_html_e( 'Muestra contexto de idioma solo a administradores.', 'mls' ); ?></small></span><input type="checkbox" name="mls_settings[debug_mode]" value="1" <?php checked( $settings['debug_mode'], 1 ); ?>></label>
+							<label class="mls-toggle-row"><span><strong><?php esc_html_e( 'Borrar datos al desinstalar', 'mls' ); ?></strong><small><?php esc_html_e( 'Si se desactiva (recomendado), las traducciones se conservan aunque se elimine el plugin.', 'mls' ); ?></small></span><input type="checkbox" name="mls_settings[delete_data_on_uninstall]" value="1" <?php checked( ! empty( $settings['delete_data_on_uninstall'] ), true ); ?>></label>
+							<div class="mls-field"><label class="mls-label" for="mls_translation_fallback"><?php esc_html_e( 'Si falta la traducción en una URL /idioma/', 'mls' ); ?></label>
+								<select class="mls-select" id="mls_translation_fallback" name="mls_settings[translation_fallback]">
+									<option value="source" <?php selected( 'source', isset( $settings['translation_fallback'] ) ? $settings['translation_fallback'] : 'source' ); ?>><?php esc_html_e( 'Mostrar el contenido de origen (reserva)', 'mls' ); ?></option>
+									<option value="404" <?php selected( '404', isset( $settings['translation_fallback'] ) ? $settings['translation_fallback'] : 'source' ); ?>><?php esc_html_e( 'Devolver 404 (estricto)', 'mls' ); ?></option>
+								</select>
+							</div>
 						</div>
 					</section>
 
@@ -956,7 +986,12 @@ class MLS_Admin {
 
 		$total_pairs = (int) $q->found_posts * count( $query_targets );
 		$translated_count = 0; $outdated_count = 0; $pending_count = 0;
-		foreach ( $q->posts as $p ) foreach ( $query_targets as $lang ) { $t = MLS_DB::get_translation( $p->ID, $lang ); if ( ! $t ) $pending_count++; elseif ( MLS_DB::is_outdated( $t ) ) $outdated_count++; else $translated_count++; }
+		foreach ( $q->posts as $p ) foreach ( $query_targets as $lang ) {
+			$t = MLS_DB::get_translation( $p->ID, $lang );
+			if ( ! $t || in_array( (string) $t->status, array( MLS_DB::STATUS_PENDING, MLS_DB::STATUS_TRANSLATING, MLS_DB::STATUS_FAILED ), true ) ) { $pending_count++; }
+			elseif ( MLS_DB::STATUS_OUTDATED === (string) $t->status || MLS_DB::is_outdated( $t ) ) { $outdated_count++; }
+			else { $translated_count++; }
+		}
 		?>
 		<div class="wrap mls-admin mls-translations-page">
 			<div class="mls-page-header"><div><h1><?php esc_html_e( 'Traducciones', 'mls' ); ?></h1><p><?php esc_html_e( 'Gestiona el contenido por idioma, revisa estados y sincroniza traducciones.', 'mls' ); ?></p></div><button type="button" class="mls-button mls-button--primary" id="mls-sync-now"><?php esc_html_e( 'Traducir pendientes', 'mls' ); ?></button></div>
@@ -969,8 +1004,8 @@ class MLS_Admin {
 			<div class="mls-card mls-table-card">
 			<?php if ( empty( $q->posts ) ) : ?><div class="mls-empty-state"><h2><?php esc_html_e( 'Sin resultados', 'mls' ); ?></h2><p><?php esc_html_e( 'No encontramos contenido con estos filtros.', 'mls' ); ?></p></div><?php else : ?>
 			<table class="mls-table"><thead><tr><th><?php esc_html_e( 'Contenido', 'mls' ); ?></th><th><?php esc_html_e( 'Tipo', 'mls' ); ?></th><th><?php esc_html_e( 'Constructor', 'mls' ); ?></th><th><?php esc_html_e( 'Idioma', 'mls' ); ?></th><th><?php esc_html_e( 'Estado', 'mls' ); ?></th><th><?php esc_html_e( 'Actualizado', 'mls' ); ?></th><th><?php esc_html_e( 'Acciones', 'mls' ); ?></th></tr></thead><tbody>
-			<?php foreach ( $q->posts as $p ) : $builder=MLS_Content_Resolver::detect_builder($p->ID); foreach ( $query_targets as $lang ) : $translation=MLS_DB::get_translation($p->ID,$lang); $outdated=$translation&&MLS_DB::is_outdated($translation); $status=!$translation?'pending':($outdated?'outdated':('manual'===$translation->status?'manual':'auto')); $labels=array('pending'=>__('Pendiente','mls'),'outdated'=>__('Desactualizada','mls'),'manual'=>__('Manual','mls'),'auto'=>__('Traducida','mls')); $edit_url=add_query_arg(array('page'=>'mls-edit-translation','post_id'=>$p->ID,'lang'=>$lang),admin_url('admin.php')); ?>
-			<tr class="mls-status-cell" data-post-id="<?php echo esc_attr($p->ID); ?>" data-lang="<?php echo esc_attr($lang); ?>"><td data-label="Contenido"><strong><?php echo esc_html($p->post_title ?: __('(sin título)','mls')); ?></strong><small class="mls-row-slug"><?php echo esc_html('/'.$p->post_name.'/'); ?></small></td><td data-label="Tipo"><?php $pto=get_post_type_object($p->post_type); echo esc_html($pto ? $pto->labels->singular_name : $p->post_type); ?></td><td data-label="Constructor"><span class="mls-badge mls-badge--neutral"><?php echo esc_html(MLS_Content_Resolver::label($builder)); ?></span></td><td data-label="Idioma"><strong><?php echo esc_html(strtoupper($lang)); ?></strong></td><td data-label="Estado"><span class="mls-status-label mls-status-pill mls-status-<?php echo esc_attr($status); ?>"><?php echo esc_html($labels[$status]); ?></span><?php if($translation): ?><small class="mls-row-meta"><?php echo 'manual'===$translation->status ? esc_html__('Editada manualmente','mls') : esc_html__('Automática','mls'); ?></small><?php endif; ?></td><td data-label="Actualizado"><?php echo $translation ? esc_html(mysql2date(get_option('date_format'),$translation->updated_at)) : '—'; ?></td><td data-label="Acciones"><div class="mls-row-actions"><?php if($translation): ?><a class="mls-button mls-button--small mls-button--secondary" href="<?php echo esc_url($edit_url); ?>"><?php esc_html_e('Editar','mls'); ?></a><a class="mls-button mls-button--small mls-button--ghost" target="_blank" rel="noopener" href="<?php echo esc_url(mls_get_translated_url($p->ID,$lang)); ?>"><?php esc_html_e('Ver','mls'); ?></a><?php endif; ?><a href="#" class="mls-translate-now" data-post-id="<?php echo esc_attr($p->ID); ?>" data-lang="<?php echo esc_attr($lang); ?>"><?php esc_html_e('Traducir','mls'); ?></a></div></td></tr>
+			<?php foreach ( $q->posts as $p ) : $builder=MLS_Content_Resolver::detect_builder($p->ID); foreach ( $query_targets as $lang ) : $translation=MLS_DB::get_translation($p->ID,$lang); $outdated=$translation&&(MLS_DB::STATUS_OUTDATED===(string)$translation->status||MLS_DB::is_outdated($translation)); $real_status=!$translation?MLS_DB::STATUS_PENDING:($outdated?MLS_DB::STATUS_OUTDATED:(string)$translation->status); $css_status=array(MLS_DB::STATUS_PUBLISHED=>'auto',MLS_DB::STATUS_TRANSLATING=>'pending',MLS_DB::STATUS_FAILED=>'outdated'); $status=isset($css_status[$real_status])?$css_status[$real_status]:$real_status; $edit_url=add_query_arg(array('page'=>'mls-edit-translation','post_id'=>$p->ID,'lang'=>$lang),admin_url('admin.php')); ?>
+			<tr class="mls-status-cell" data-post-id="<?php echo esc_attr($p->ID); ?>" data-lang="<?php echo esc_attr($lang); ?>"><td data-label="Contenido"><strong><?php echo esc_html($p->post_title ?: __('(sin título)','mls')); ?></strong><small class="mls-row-slug"><?php echo esc_html('/'.$p->post_name.'/'); ?></small></td><td data-label="Tipo"><?php $pto=get_post_type_object($p->post_type); echo esc_html($pto ? $pto->labels->singular_name : $p->post_type); ?></td><td data-label="Constructor"><span class="mls-badge mls-badge--neutral"><?php echo esc_html(MLS_Content_Resolver::label($builder)); ?></span></td><td data-label="Idioma"><strong><?php echo esc_html(strtoupper($lang)); ?></strong></td><td data-label="Estado"><span class="mls-status-label mls-status-pill mls-status-<?php echo esc_attr($status); ?>"><?php echo esc_html(MLS_DB::status_label($real_status)); ?></span><?php if($translation && MLS_DB::STATUS_FAILED===(string)$translation->status && $translation->error_message): ?><small class="mls-row-meta"><?php echo esc_html($translation->error_message); ?></small><?php elseif($translation): ?><small class="mls-row-meta"><?php echo 'manual'===$translation->status ? esc_html__('Editada manualmente','mls') : esc_html__('Automática','mls'); ?></small><?php endif; ?></td><td data-label="Actualizado"><?php echo $translation ? esc_html(mysql2date(get_option('date_format'),$translation->updated_at)) : '—'; ?></td><td data-label="Acciones"><div class="mls-row-actions"><?php if($translation): ?><a class="mls-button mls-button--small mls-button--secondary" href="<?php echo esc_url($edit_url); ?>"><?php esc_html_e('Editar','mls'); ?></a><a class="mls-button mls-button--small mls-button--ghost" target="_blank" rel="noopener" href="<?php echo esc_url(mls_get_translated_url($p->ID,$lang)); ?>"><?php esc_html_e('Ver','mls'); ?></a><?php endif; ?><a href="#" class="mls-translate-now" data-post-id="<?php echo esc_attr($p->ID); ?>" data-lang="<?php echo esc_attr($lang); ?>"><?php esc_html_e('Traducir','mls'); ?></a></div></td></tr>
 			<?php endforeach; endforeach; ?></tbody></table><?php endif; ?></div>
 			<?php if ( $q->max_num_pages > 1 ) : ?><div class="mls-pagination"><?php echo wp_kses_post( paginate_links( array( 'total'=>$q->max_num_pages, 'current'=>$paged, 'format'=>'?paged=%#%', 'add_args'=>array_filter(array('page'=>'mls-translations','s'=>$search,'lang'=>$lang_filter,'content_type'=>$type_filter)) ) ) ); ?></div><?php endif; ?>
 		</div>
@@ -1002,22 +1037,20 @@ class MLS_Admin {
 				admin_url( 'admin.php' )
 			);
 
-			$status = 'pending';
-			if ( $translation ) {
-				$status = ( 'manual' === $translation->status ) ? 'manual' : 'auto';
-			}
-			$status_label = array(
-				'pending' => __( 'Pendiente', 'mls' ),
-				'manual'  => __( 'Editado a mano', 'mls' ),
-				'auto'    => __( 'Traducido (auto)', 'mls' ),
+			$real_status = $translation ? (string) $translation->status : MLS_DB::STATUS_PENDING;
+			$css_map     = array(
+				MLS_DB::STATUS_PUBLISHED   => 'auto',
+				MLS_DB::STATUS_TRANSLATING => 'pending',
+				MLS_DB::STATUS_FAILED      => 'outdated',
 			);
+			$status = isset( $css_map[ $real_status ] ) ? $css_map[ $real_status ] : $real_status;
 
 			printf(
 				'<li class="mls-status-cell" data-post-id="%1$d" data-lang="%2$s"><strong>%3$s:</strong> <span class="mls-status-label mls-status-pill mls-status-%7$s">%4$s</span><br />%5$s<a href="#" class="mls-translate-now" data-post-id="%1$d" data-lang="%2$s">%6$s</a></li>',
 				$post->ID,
 				esc_attr( $lang ),
 				esc_html( strtoupper( $lang ) ),
-				esc_html( $status_label[ $status ] ),
+				esc_html( MLS_DB::status_label( $real_status ) ),
 				$translation ? '<a href="' . esc_url( $edit_url ) . '">' . esc_html__( 'Editar', 'mls' ) . '</a> · ' : '',
 				esc_html__( 'Traducir ahora', 'mls' ),
 				esc_attr( $status )

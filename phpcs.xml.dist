@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<ruleset name="Multilingual SEO Translator">
+	<description>WordPress Coding Standards para el plugin.</description>
+
+	<file>.</file>
+
+	<exclude-pattern>/vendor/*</exclude-pattern>
+	<exclude-pattern>/node_modules/*</exclude-pattern>
+	<exclude-pattern>/tests/*</exclude-pattern>
+	<exclude-pattern>/assets/*</exclude-pattern>
+
+	<arg name="basepath" value="."/>
+	<arg name="colors"/>
+	<arg name="extensions" value="php"/>
+	<arg value="sp"/>
+	<arg name="parallel" value="8"/>
+
+	<config name="minimum_supported_wp_version" value="5.8"/>
+	<config name="testVersion" value="7.4-"/>
+
+	<rule ref="WordPress">
+		<!-- El plugin usa un prefijo corto consistente (mls_ / MLS_). -->
+		<exclude name="WordPress.NamingConventions.PrefixAllGlobals.ShortPrefixPassed"/>
+	</rule>
+
+	<rule ref="WordPress.WP.I18n">
+		<properties>
+			<property name="text_domain" type="array" value="mls"/>
+		</properties>
+	</rule>
+
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+		<properties>
+			<property name="prefixes" type="array" value="mls,MLS,MLS_"/>
+		</properties>
+	</rule>
+
+	<rule ref="PHPCompatibilityWP"/>
+</ruleset>

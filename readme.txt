@@ -4,7 +4,7 @@ Tags: traducción, multilenguaje, seo, hreflang, google translate
 Requires at least: 5.8
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 3.0.2
+Stable tag: 3.0.6
 License: GPLv2 or later
 
 Traduce automáticamente tu contenido con la API de Google Cloud Translation, publícalo en dominio.com/{idioma}/ y sigue buenas prácticas de SEO multilenguaje.
@@ -49,6 +49,29 @@ Este plugin:
 * La API de Google Cloud Translation es de pago por volumen de caracteres; revisa la cuota y el costo en tu consola de Google Cloud.
 
 == Changelog ==
+
+= 3.0.6 =
+* La caché de HTML documental de Elementor (`_elementor_element_cache`) se
+  desactiva en TODO el frontend mientras haya idiomas destino configurados,
+  no solo en las URLs `/idioma/`. Esa caché es por post_id y sin idioma, así
+  que también dejaba la página FUENTE con contenido incompleto o mezclado
+  (típicamente los widgets "Editor de texto" no se renderizaban). Filtro
+  `mls_disable_elementor_document_cache` para revertir.
+* La lectura de `_elementor_element_cache` se intercepta en cualquier URL del
+  frontend (no solo traducida) y devuelve vacío para forzar render fresco.
+
+= 3.0.5 =
+* **Caché de HTML documental de Elementor envenenada.** Elementor guarda el
+  HTML ya renderizado en el postmeta `_elementor_element_cache`, por post_id y
+  sin distinguir idioma. Una versión anterior hizo que se guardara el render
+  en inglés (e incompleto) bajo el mismo post_id que la página fuente. Se
+  añade: (1) purga única versionada al desplegar; (2) en `/idioma/` se
+  devuelve "sin caché" al leer esa meta; (3) se cancela la ESCRITURA de esa
+  meta en `/idioma/`; (4) al traducir se borra para ese post.
+* `translate_elementor` valida "sin texto traducible" antes de llamar al
+  proveedor. Se saltan los kits de Elementor (ajustes globales).
+* `get_request_relative_path()` compartido para instalaciones en subdirectorio;
+  `the_content` con respaldo de traducción para clásico/Gutenberg.
 
 = 3.0.2 =
 * **Render de Elementor reescrito.** En vez de depender del filtro `elementor/frontend/builder_content_data` (poco fiable según la versión de Elementor), ahora se intercepta `get_post_metadata` para `_elementor_data` y se devuelve el JSON ya traducido — la misma técnica de WPML/Polylang. Funciona con página, entrada, **cabecera, pie, plantillas del Theme Builder y popups**, y respeta la caché de Elementor. El `_elementor_data` original nunca se modifica.

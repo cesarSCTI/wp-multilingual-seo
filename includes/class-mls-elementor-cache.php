@@ -4,53 +4,58 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Aislamiento de caché de Elementor por idioma.
+ * Aislamiento de la caché de Elementor por idioma.
  *
- * Elementor >= 3.22 puede convertir elementos en shortcodes cacheables y
- * expone `elementor/element_cache/unique_id` como discriminador del caché.
- * Como MLS reutiliza el mismo post/element IDs en todos los idiomas, el
- * idioma DEBE formar parte de ese discriminador o un render EN puede ser
- * reutilizado en la URL ES.
+ * Elementor cachea el HTML renderizado del documento en el postmeta
+ * `_elementor_element_cache`, indexado por post_id y SIN distinguir idioma.
+ * Como este plugin sirve el mismo post_id en varios idiomas (sin duplicar),
+ * esa caché es incompatible: devolvería el HTML de un idioma en la URL de
+ * otro, y una vez escrita se "envenena" para todos.
+ *
+ * Solución: mientras haya idiomas destino configurados, se desactiva esa
+ * caché de HTML documental en el FRONTEND (filtro `mls_disable_elementor_document_cache`
+ * para revertir). El resto de cachés de Elementor (CSS, assets) no dependen
+ * del idioma y siguen igual. La caché de PÁGINA de LiteSpeed/servidor sigue
+ * funcionando y cachea cada URL por separado, así que el impacto real es
+ * pequeño (solo el primer render de cada URL y los usuarios logueados).
+ *
+ * Además, para la caché de elementos como shortcode (Elementor >= 3.22) se
+ * añade el idioma al discriminador `elementor/element_cache/unique_id`.
  */
 class MLS_Elementor_Cache {
 
 	public function __construct() {
-		add_filter( 'option_elementor_element_cache_ttl', array( $this, 'disable_document_cache_for_translation' ), 999 );
-		add_filter( 'default_option_elementor_element_cache_ttl', array( $this, 'disable_document_cache_for_translation' ), 999 );
+		add_filter( 'option_elementor_element_cache_ttl', array( $this, 'maybe_disable_document_cache' ), 999 );
+		add_filter( 'default_option_elementor_element_cache_ttl', array( $this, 'maybe_disable_document_cache' ), 999 );
 		add_filter( 'elementor/element_cache/unique_id', array( $this, 'add_language_discriminator' ), 20 );
 	}
 
-
 	/**
-	 * Elementor guarda tambien un cache de documento completo por post_id.
-	 * Ese cache no usa el discriminador unique_id y puede devolver el HTML
-	 * fuente en /en/. Se desactiva solo para URLs de traduccion; el idioma
-	 * fuente conserva exactamente la configuracion global de Elementor.
-	 *
 	 * @param mixed $ttl
-	 * @return mixed
+	 * @return mixed  'disable' para apagar la caché de HTML documental.
 	 */
-	public function disable_document_cache_for_translation( $ttl ) {
+	public function maybe_disable_document_cache( $ttl ) {
 		if ( is_admin() || wp_doing_cron() ) {
 			return $ttl;
 		}
-
-		if ( class_exists( 'MLS_Language_Context' ) && MLS_Language_Context::is_translation_request() ) {
-			return 'disable';
+		if ( ! class_exists( 'MLS_Language_Registry' ) ) {
+			return $ttl;
 		}
-
-		// Elementor puede leer la opcion antes de que WordPress termine de
-		// resolver query_vars. La URL real sigue siendo una senal segura.
-		if ( class_exists( 'MLS_Language_Registry' ) ) {
-			foreach ( array_keys( MLS_Language_Registry::targets() ) as $lang ) {
-				if ( MLS_Language_Context::request_matches_language_prefix( $lang ) ) {
-					return 'disable';
-				}
-			}
+		// Solo si el plugin está realmente traduciendo algo.
+		if ( empty( MLS_Language_Registry::targets() ) ) {
+			return $ttl;
 		}
-
-		return $ttl;
+		/**
+		 * Permite volver a activar la caché de HTML documental de Elementor
+		 * (por defecto desactivada mientras haya traducción) si el sitio
+		 * gestiona el keying por idioma por su cuenta.
+		 */
+		if ( ! apply_filters( 'mls_disable_elementor_document_cache', true ) ) {
+			return $ttl;
+		}
+		return 'disable';
 	}
+
 	/**
 	 * @param string $unique_id Identificador aportado por Elementor/terceros.
 	 * @return string

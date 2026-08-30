@@ -3,7 +3,7 @@
  * Plugin Name:       Multilingual SEO Translator (Google API)
  * Plugin URI:        https://example.com
  * Description:       Traduce automáticamente tus contenidos usando la API de Google Cloud Translation, genera URLs por idioma (dominio.com/en/, dominio.com/fr/...), redirige visitantes según el idioma del navegador y sigue buenas prácticas de SEO multilenguaje (hreflang, canonical, sitemap por idioma).
- * Version:           3.0.5
+ * Version:           3.0.6
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            Tu Sitio
@@ -32,7 +32,7 @@ if ( defined( 'MLS_VERSION' ) ) {
 	return;
 }
 
-define( 'MLS_VERSION', '3.0.5' );
+define( 'MLS_VERSION', '3.0.6' );
 define( 'MLS_ELEMENTOR_CACHE_SCHEMA_VERSION', '3' );
 define( 'MLS_DB_VERSION', '2.4.0' );
 define( 'MLS_PLUGIN_FILE', __FILE__ );

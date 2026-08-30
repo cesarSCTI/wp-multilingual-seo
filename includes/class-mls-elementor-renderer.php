@@ -53,13 +53,27 @@ class MLS_Elementor_Renderer {
 	}
 
 	/**
+	 * ¿Hay traducción activa en este sitio (idiomas destino configurados)?
+	 * Cuando la hay, la caché de HTML documental de Elementor -- por post_id,
+	 * sin idioma -- no se puede usar en NINGUNA URL del frontend.
+	 */
+	private function translation_enabled_frontend() {
+		return ! is_admin()
+			&& ! self::$reentry
+			&& ! wp_doing_cron()
+			&& ! ( defined( 'REST_REQUEST' ) && REST_REQUEST )
+			&& class_exists( 'MLS_Language_Registry' )
+			&& ! empty( MLS_Language_Registry::targets() );
+	}
+
+	/**
 	 * @param mixed  $check
 	 * @param int    $object_id
 	 * @param string $meta_key
 	 * @return mixed  false cancela la escritura; null la deja seguir.
 	 */
 	public function block_element_cache_write( $check, $object_id, $meta_key ) {
-		if ( '_elementor_element_cache' === $meta_key && $this->active() ) {
+		if ( '_elementor_element_cache' === $meta_key && $this->translation_enabled_frontend() ) {
 			return false;
 		}
 		return $check;
@@ -91,17 +105,19 @@ class MLS_Elementor_Renderer {
 		if ( '_elementor_data' !== $meta_key && '_elementor_element_cache' !== $meta_key ) {
 			return $value;
 		}
-		if ( ! $this->active() ) {
-			return $value;
+
+		// La caché de HTML documental (por post_id, sin idioma) no se puede
+		// usar en NINGUNA URL del frontend cuando hay traducción: en /en/
+		// devolvería el HTML fuente, y en / uno que pudo quedar envenenado.
+		// Se devuelve vacía para forzar render fresco (de _elementor_data real
+		// en la fuente, o del traducido más abajo en /en/).
+		if ( '_elementor_element_cache' === $meta_key ) {
+			return $this->translation_enabled_frontend() ? ( $single ? '' : array() ) : $value;
 		}
 
-		// En una petición traducida, Elementor NO debe usar su caché de HTML
-		// documental (`_elementor_element_cache`): esa meta es por post_id, no
-		// distingue idioma, y devolvería el HTML fuente (o uno envenenado) en
-		// /en/. Se le devuelve "sin caché" para que renderice fresco a partir
-		// del `_elementor_data` ya traducido.
-		if ( '_elementor_element_cache' === $meta_key ) {
-			return $single ? '' : array();
+		// A partir de aquí, solo _elementor_data en peticiones traducidas.
+		if ( ! $this->active() ) {
+			return $value;
 		}
 
 		$post_id = (int) $object_id;

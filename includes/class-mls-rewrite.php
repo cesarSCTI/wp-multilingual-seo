@@ -225,13 +225,7 @@ class MLS_Rewrite {
 		}
 
 		$request_path = (string) wp_parse_url( wp_unslash( $_SERVER['REQUEST_URI'] ), PHP_URL_PATH );
-		$home_path    = (string) wp_parse_url( home_url( '/' ), PHP_URL_PATH );
-
-		$relative = $request_path;
-		if ( $home_path && 0 === strpos( $request_path, $home_path ) ) {
-			$relative = substr( $request_path, strlen( $home_path ) );
-		}
-		$relative = ltrim( $relative, '/' );
+		$relative     = MLS_Language_Context::get_request_relative_path();
 
 		$matches_prefix = ( $relative === $expected_lang ) || ( 0 === strpos( $relative, $expected_lang . '/' ) );
 

@@ -116,6 +116,35 @@ class MLS_Language_Context {
 	}
 
 	/**
+	 * Devuelve el path real relativo a home_url(), respetando instalaciones
+	 * en subdirectorios y limites de segmento. Por ejemplo, una instalacion
+	 * en /site/ elimina /site/ de /site/en/page/, pero nunca confunde
+	 * /site-other/en/ con una URL interna de WordPress.
+	 *
+	 * @return string Sin barras al inicio o final.
+	 */
+	public static function get_request_relative_path() {
+		if ( empty( $_SERVER['REQUEST_URI'] ) ) {
+			return '';
+		}
+
+		$request_path = (string) wp_parse_url( wp_unslash( $_SERVER['REQUEST_URI'] ), PHP_URL_PATH );
+		$home_path    = (string) wp_parse_url( home_url( '/' ), PHP_URL_PATH );
+		$home_base    = rtrim( $home_path, '/' );
+		$relative     = $request_path;
+
+		if ( '' !== $home_base ) {
+			if ( $request_path === $home_base ) {
+				$relative = '';
+			} elseif ( 0 === strpos( $request_path, $home_base . '/' ) ) {
+				$relative = substr( $request_path, strlen( $home_base ) + 1 );
+			}
+		}
+
+		return trim( $relative, '/' );
+	}
+
+	/**
 	 * @return int|null El post_id resuelto para esta URL traducida (si aplica).
 	 */
 	public static function get_requested_post_id() {
@@ -136,15 +165,7 @@ class MLS_Language_Context {
 			return false;
 		}
 
-		$request_path = (string) wp_parse_url( wp_unslash( $_SERVER['REQUEST_URI'] ), PHP_URL_PATH );
-		$home_path    = (string) wp_parse_url( home_url( '/' ), PHP_URL_PATH );
-		$relative     = $request_path;
-
-		if ( $home_path && '/' !== $home_path && 0 === strpos( $request_path, $home_path ) ) {
-			$relative = substr( $request_path, strlen( $home_path ) );
-		}
-
-		$relative = trim( $relative, '/' );
+		$relative = self::get_request_relative_path();
 		return $relative === $lang || 0 === strpos( $relative, $lang . '/' );
 	}
 

@@ -3,7 +3,7 @@
  * Plugin Name:       Multilingual SEO Translator (Google API)
  * Plugin URI:        https://example.com
  * Description:       Traduce automáticamente tus contenidos usando la API de Google Cloud Translation, genera URLs por idioma (dominio.com/en/, dominio.com/fr/...), redirige visitantes según el idioma del navegador y sigue buenas prácticas de SEO multilenguaje (hreflang, canonical, sitemap por idioma).
- * Version:           3.0.2
+ * Version:           3.0.4
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            Tu Sitio
@@ -32,7 +32,7 @@ if ( defined( 'MLS_VERSION' ) ) {
 	return;
 }
 
-define( 'MLS_VERSION', '3.0.2' );
+define( 'MLS_VERSION', '3.0.4' );
 define( 'MLS_DB_VERSION', '2.4.0' );
 define( 'MLS_PLUGIN_FILE', __FILE__ );
 define( 'MLS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
@@ -222,6 +222,13 @@ function mls_purge_translation_caches( $post_id, $lang ) {
  * @return array
  */
 function mls_get_settings() {
+	// No usar get_locale() aqui: MLS_Locale filtra esa funcion y necesita a
+	// su vez estos ajustes, lo que produciria recursion infinita durante el
+	// render de una URL traducida. WPLANG es el locale base sin filtrar.
+	$site_locale = (string) get_option( 'WPLANG', '' );
+	if ( '' === $site_locale ) {
+		$site_locale = defined( 'WPLANG' ) && WPLANG ? WPLANG : 'en_US';
+	}
 	$defaults = array(
 		'api_key'                => '',
 		'source_lang'            => substr( get_locale(), 0, 2 ),
@@ -253,7 +260,9 @@ function mls_get_settings() {
  */
 function mls_debug_log( $message, $force = false ) {
 	if ( ! $force ) {
-		$settings = mls_get_settings();
+		// La ruta de logging no debe depender del locale que esta registrando.
+		// Leer la opcion cruda evita reentradas durante el render.
+		$settings = get_option( 'mls_settings', array() );
 		if ( empty( $settings['debug_mode'] ) ) {
 			return;
 		}

@@ -113,7 +113,7 @@ class MLS_Elementor_Renderer {
 		}
 
 		self::$applied[ (int) $post_id ] = count( $units );
-		mls_debug_log( 'Elementor (respaldo builder_content_data): post=' . (int) $post_id . ' unidades=' . count( $units ) );
+		mls_debug_log( 'Elementor (builder_content_data): post=' . (int) $post_id . ' unidades=' . count( $units ) );
 		return MLS_Elementor_Adapter::apply_translations_to_data( $data, $units );
 	}
 

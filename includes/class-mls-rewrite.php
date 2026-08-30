@@ -33,6 +33,7 @@ class MLS_Rewrite {
 		add_filter( 'the_posts', array( $this, 'swap_translated_fields' ), 10, 2 );
 
 		add_filter( 'the_title', array( $this, 'filter_the_title' ), 10, 2 );
+		add_filter( 'the_content', array( $this, 'filter_the_content' ), 9 );
 		add_filter( 'the_excerpt', array( $this, 'filter_the_excerpt' ) );
 	}
 
@@ -283,6 +284,42 @@ class MLS_Rewrite {
 		}
 		$translation = MLS_DB::get_translation( $post_id, MLS_Language_Context::get_current_language() );
 		return ( MLS_DB::is_servable( $translation ) && '' !== $translation->post_title ) ? $translation->post_title : $title;
+	}
+
+	/**
+	 * Sustituye el cuerpo tambien en el punto de salida. Algunos temas y
+	 * constructores vuelven a cargar el WP_Post original despues de
+	 * `the_posts`; sin este respaldo el titulo se traducia, pero el cuerpo no.
+	 *
+	 * Elementor se excluye: sus textos viven en `_elementor_data` y los
+	 * intercambia MLS_Elementor_Renderer antes de generar el HTML.
+	 *
+	 * @param string $content
+	 * @return string
+	 */
+	public function filter_the_content( $content ) {
+		if ( MLS_Language_Context::is_source_request() ) {
+			return $content;
+		}
+
+		$post_id = get_the_ID();
+		if ( ! $post_id ) {
+			$post_id = MLS_Language_Context::get_requested_post_id();
+		}
+		if ( ! $post_id ) {
+			return $content;
+		}
+
+		$translation = MLS_DB::get_translation( $post_id, MLS_Language_Context::get_current_language() );
+		if ( ! MLS_DB::is_servable( $translation ) || '' === (string) $translation->post_content ) {
+			return $content;
+		}
+
+		if ( class_exists( 'MLS_Elementor_Adapter' ) && MLS_Elementor_Adapter::is_elementor_post( $post_id ) ) {
+			return $content;
+		}
+
+		return $translation->post_content;
 	}
 
 	public function filter_the_excerpt( $excerpt ) {

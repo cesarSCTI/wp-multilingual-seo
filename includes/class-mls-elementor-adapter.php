@@ -92,26 +92,39 @@ class MLS_Elementor_Adapter {
 	 * caché de archivos de Elementor.
 	 */
 	public static function clear_elementor_render_cache( $force = false ) {
-		// Desactivado por defecto: `files_manager->clear_cache()` regenera el
-		// CSS de TODO el sitio, lo que contradice el aislamiento del plugin.
-		// El aislamiento del Element Cache por idioma (MLS_Elementor_Cache) ya
-		// impide que un render EN se sirva en la URL ES. Quien de verdad lo
-		// necesite puede reactivarlo con este filtro. `$force` lo activa para
-		// casos puntuales (traducción de una plantilla del Theme Builder).
+		// `files_manager->clear_cache()` regenera el CSS de TODO el sitio, así
+		// que solo se hace con `$force` (migración única al actualizar, o
+		// traducción de una plantilla del Theme Builder) o si se activa el
+		// filtro. El aislamiento por idioma del día a día lo hace
+		// MLS_Elementor_Cache desactivando el caché documental en /en/.
 		if ( ! $force && ! apply_filters( 'mls_clear_elementor_cache_on_save', false ) ) {
-			return;
+			return false;
 		}
-		if ( ! class_exists( '\Elementor\Plugin' ) ) {
-			return;
+
+		$done = false;
+
+		// 1) Limpieza directa de los metadatos de caché (regenerables). Cubre
+		//    versiones de Elementor donde clear_cache() no toca el element cache.
+		global $wpdb;
+		if ( isset( $wpdb ) ) {
+			$wpdb->query( "DELETE FROM {$wpdb->postmeta} WHERE meta_key IN ('_elementor_element_cache','_elementor_css')" ); // phpcs:ignore WordPress.DB
+			$done = true;
 		}
-		try {
-			$instance = \Elementor\Plugin::$instance;
-			if ( $instance && isset( $instance->files_manager ) && method_exists( $instance->files_manager, 'clear_cache' ) ) {
-				$instance->files_manager->clear_cache();
+
+		// 2) API pública de Elementor (CSS en archivos, transients, etc.).
+		if ( class_exists( '\Elementor\Plugin' ) ) {
+			try {
+				$instance = \Elementor\Plugin::$instance;
+				if ( $instance && isset( $instance->files_manager ) && method_exists( $instance->files_manager, 'clear_cache' ) ) {
+					$instance->files_manager->clear_cache();
+					$done = true;
+				}
+			} catch ( \Throwable $e ) {
+				// Un cambio interno de la API de Elementor no debe romper nada.
 			}
-		} catch ( \Throwable $e ) {
-			// No dejamos que un cambio interno de la API de Elementor rompa el guardado de la traducción.
 		}
+
+		return $done;
 	}
 
 	/**

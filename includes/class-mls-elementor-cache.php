@@ -16,6 +16,7 @@ class MLS_Elementor_Cache {
 
 	public function __construct() {
 		add_filter( 'option_elementor_element_cache_ttl', array( $this, 'disable_document_cache_for_translation' ), 999 );
+		add_filter( 'default_option_elementor_element_cache_ttl', array( $this, 'disable_document_cache_for_translation' ), 999 );
 		add_filter( 'elementor/element_cache/unique_id', array( $this, 'add_language_discriminator' ), 20 );
 	}
 
@@ -30,19 +31,21 @@ class MLS_Elementor_Cache {
 	 * @return mixed
 	 */
 	public function disable_document_cache_for_translation( $ttl ) {
-		if ( is_admin() || wp_doing_ajax() || wp_doing_cron() ) {
+		if ( is_admin() || wp_doing_cron() ) {
 			return $ttl;
 		}
 
-		if ( MLS_Language_Context::is_translation_request() ) {
+		if ( class_exists( 'MLS_Language_Context' ) && MLS_Language_Context::is_translation_request() ) {
 			return 'disable';
 		}
 
 		// Elementor puede leer la opcion antes de que WordPress termine de
 		// resolver query_vars. La URL real sigue siendo una senal segura.
-		foreach ( array_keys( MLS_Language_Registry::targets() ) as $lang ) {
-			if ( MLS_Language_Context::request_matches_language_prefix( $lang ) ) {
-				return 'disable';
+		if ( class_exists( 'MLS_Language_Registry' ) ) {
+			foreach ( array_keys( MLS_Language_Registry::targets() ) as $lang ) {
+				if ( MLS_Language_Context::request_matches_language_prefix( $lang ) ) {
+					return 'disable';
+				}
 			}
 		}
 
@@ -66,8 +69,8 @@ class MLS_Elementor_Cache {
 			$lang = 'source';
 		}
 
-		$version = defined( 'MLS_VERSION' ) ? sanitize_key( MLS_VERSION ) : 'current';
-		$mls_id  = 'mls-' . $lang . '-' . $version;
+		$version = defined( 'MLS_ELEMENTOR_CACHE_SCHEMA_VERSION' ) ? sanitize_key( MLS_ELEMENTOR_CACHE_SCHEMA_VERSION ) : '1';
+		$mls_id  = 'mls-' . $lang . '-v' . $version;
 		return $unique_id ? $unique_id . '|' . $mls_id : $mls_id;
 	}
 }

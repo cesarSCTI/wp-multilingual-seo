@@ -44,6 +44,25 @@ class MLS_Elementor_Renderer {
 	public function __construct() {
 		add_filter( 'get_post_metadata', array( $this, 'swap_elementor_data' ), 10, 4 );
 		add_filter( 'elementor/frontend/builder_content_data', array( $this, 'filter_render_tree' ), 20, 2 );
+
+		// En /en/ Elementor NO debe ESCRIBIR su caché de HTML documental: si
+		// lo hiciera, guardaría el render en inglés bajo el mismo post_id y
+		// la página fuente / acabaría sirviéndolo. Se cancela esa escritura.
+		add_filter( 'update_post_metadata', array( $this, 'block_element_cache_write' ), 10, 3 );
+		add_filter( 'add_post_metadata', array( $this, 'block_element_cache_write' ), 10, 3 );
+	}
+
+	/**
+	 * @param mixed  $check
+	 * @param int    $object_id
+	 * @param string $meta_key
+	 * @return mixed  false cancela la escritura; null la deja seguir.
+	 */
+	public function block_element_cache_write( $check, $object_id, $meta_key ) {
+		if ( '_elementor_element_cache' === $meta_key && $this->active() ) {
+			return false;
+		}
+		return $check;
 	}
 
 	/**
@@ -69,8 +88,20 @@ class MLS_Elementor_Renderer {
 	 * @return mixed
 	 */
 	public function swap_elementor_data( $value, $object_id, $meta_key, $single ) {
-		if ( '_elementor_data' !== $meta_key || ! $this->active() ) {
+		if ( '_elementor_data' !== $meta_key && '_elementor_element_cache' !== $meta_key ) {
 			return $value;
+		}
+		if ( ! $this->active() ) {
+			return $value;
+		}
+
+		// En una petición traducida, Elementor NO debe usar su caché de HTML
+		// documental (`_elementor_element_cache`): esa meta es por post_id, no
+		// distingue idioma, y devolvería el HTML fuente (o uno envenenado) en
+		// /en/. Se le devuelve "sin caché" para que renderice fresco a partir
+		// del `_elementor_data` ya traducido.
+		if ( '_elementor_element_cache' === $meta_key ) {
+			return $single ? '' : array();
 		}
 
 		$post_id = (int) $object_id;

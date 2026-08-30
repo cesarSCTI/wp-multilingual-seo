@@ -232,6 +232,9 @@ class MLS_Translator {
 		$src    = $source['code'];
 
 		$units = MLS_Elementor_Adapter::extract_units( $raw_json );
+		if ( empty( $units ) ) {
+			return new WP_Error( 'mls_no_elementor_text', __( 'La plantilla de Elementor no contiene texto traducible.', 'mls' ) );
+		}
 
 		$title = self::translate_text( $post->post_title, $src, $lang, 'text' );
 		if ( is_wp_error( $title ) ) {
@@ -239,9 +242,6 @@ class MLS_Translator {
 		}
 
 		$translated_units = self::translate_units_batch( $units, $lang, $src );
-		if ( empty( $units ) ) {
-			return new WP_Error( 'mls_no_elementor_text', __( 'La plantilla de Elementor no contiene texto traducible.', 'mls' ) );
-		}
 		if ( is_wp_error( $translated_units ) ) {
 			return $translated_units;
 		}

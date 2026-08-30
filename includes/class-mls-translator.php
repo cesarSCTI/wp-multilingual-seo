@@ -224,6 +224,9 @@ class MLS_Translator {
 		if ( ! $raw_json ) {
 			return new WP_Error( 'mls_no_elementor_data', __( 'La página no tiene datos de Elementor todavía (¿se guardó al menos una vez desde el editor?).', 'mls' ) );
 		}
+		if ( MLS_Content_Resolver::is_elementor_kit( $post_id ) ) {
+			return new WP_Error( 'mls_elementor_kit', __( 'Los kits de Elementor contienen ajustes globales y no necesitan traduccion.', 'mls' ) );
+		}
 
 		$source = MLS_Language_Registry::source();
 		$src    = $source['code'];
@@ -236,6 +239,9 @@ class MLS_Translator {
 		}
 
 		$translated_units = self::translate_units_batch( $units, $lang, $src );
+		if ( empty( $units ) ) {
+			return new WP_Error( 'mls_no_elementor_text', __( 'La plantilla de Elementor no contiene texto traducible.', 'mls' ) );
+		}
 		if ( is_wp_error( $translated_units ) ) {
 			return $translated_units;
 		}

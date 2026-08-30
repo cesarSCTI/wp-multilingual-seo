@@ -286,9 +286,13 @@ class MLS_Admin {
 			'posts_per_page' => -1,
 			'fields'         => 'ids',
 		) );
-
 		$jobs = array();
+
 		foreach ( $posts as $post_id ) {
+			if ( MLS_Content_Resolver::BUILDER_ELEMENTOR === MLS_Content_Resolver::detect_builder( $post_id )
+				&& ! MLS_Content_Resolver::has_elementor_text( $post_id ) ) {
+				continue;
+			}
 			foreach ( $targets as $lang ) {
 				if ( $lang === $settings['source_lang'] ) {
 					continue;

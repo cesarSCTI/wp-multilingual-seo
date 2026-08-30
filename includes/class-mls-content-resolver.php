@@ -18,6 +18,33 @@ class MLS_Content_Resolver {
 	const BUILDER_CLASSIC   = 'classic';
 
 	/**
+	 * Los kits guardan ajustes globales de Elementor, no contenido que se
+	 * renderice como una pagina o plantilla.
+	 *
+	 * @param int $post_id
+	 * @return bool
+	 */
+	public static function is_elementor_kit( $post_id ) {
+		return 'kit' === (string) get_post_meta( $post_id, '_elementor_template_type', true );
+	}
+
+	/**
+	 * Comprueba que un documento Elementor tenga JSON valido y al menos una
+	 * unidad de texto antes de enviarlo al proveedor de traduccion.
+	 *
+	 * @param int $post_id
+	 * @return bool
+	 */
+	public static function has_elementor_text( $post_id ) {
+		if ( self::is_elementor_kit( $post_id ) ) {
+			return false;
+		}
+		$raw = get_post_meta( $post_id, '_elementor_data', true );
+		return is_string( $raw ) && '' !== trim( $raw ) && is_array( json_decode( $raw, true ) )
+			&& ! empty( MLS_Elementor_Adapter::extract_units( $raw ) );
+	}
+
+	/**
 	 * Tipos de post que Elementor usa para sus "documentos" (cabecera, pie,
 	 * plantillas del Theme Builder, popups, landing pages...). Filtrable.
 	 *

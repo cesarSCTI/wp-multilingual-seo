@@ -196,6 +196,15 @@
 				}
 				bar.style.width = Math.round( ( done / jobs.length ) * 100 ) + '%';
 				next();
+			} ).catch( function ( err ) {
+				done++;
+				errors++;
+				var row = document.createElement( 'div' );
+				row.textContent = job.title + ' (' + job.lang + '): ' +
+					( err && err.message ? err.message : mlsAdmin.i18nUnknownError );
+				logEl.appendChild( row );
+				bar.style.width = Math.round( ( done / jobs.length ) * 100 ) + '%';
+				next();
 			} );
 		}
 

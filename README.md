@@ -12,7 +12,8 @@ bajo URLs localizadas (`/en/`, `/fr/`...) y en datos propios del plugin.
 
 El plugin **solo escribe** en:
 
-- La tabla `{prefix}_mls_translations`.
+- Sus tablas propias: `{prefix}_mls_translations`, `{prefix}_mls_meta_translations`,
+  `{prefix}_mls_term_translations`, `{prefix}_mls_menu_translations`.
 - Opciones cuyo nombre empieza por `mls_` (`mls_settings`, `mls_db_version`,
   `mls_runtime_version`, `mls_flush_rewrite_rules`).
 
@@ -27,6 +28,10 @@ plugins/temas.
 - Páginas jerárquicas: rutas padre/hijo traducidas (`/en/seccion/subpagina/`).
 - Enlaces internos localizados: permalinks, menús (URL y etiqueta), paginación
   y enlaces incrustados en el contenido se mantienen dentro del idioma.
+- Etiquetas de los menús de navegación traducibles (texto visible, atributo
+  `title` y descripción), incluidos enlaces personalizados y etiquetas editadas
+  a mano, desde "Traducción Multilenguaje → Menús". Tabla propia
+  `{prefix}_mls_menu_translations`.
 - Cambio real de locale en el frontend traducido (`.mo`/`.json` del tema y
   plugins salen en el idioma de la URL).
 - Cola de traducción con estados (`pending/translating/published/failed/

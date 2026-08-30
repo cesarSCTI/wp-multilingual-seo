@@ -15,7 +15,7 @@ if ( empty( $settings['delete_data_on_uninstall'] ) ) {
 	return;
 }
 
-foreach ( array( 'mls_translations', 'mls_meta_translations', 'mls_term_translations' ) as $t ) {
+foreach ( array( 'mls_translations', 'mls_meta_translations', 'mls_menu_translations', 'mls_term_translations' ) as $t ) {
 	$table = $wpdb->prefix . $t;
 	$wpdb->query( "DROP TABLE IF EXISTS {$table}" ); // phpcs:ignore WordPress.DB.PreparedSQL
 }

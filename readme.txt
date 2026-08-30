@@ -4,7 +4,7 @@ Tags: traducción, multilenguaje, seo, hreflang, google translate
 Requires at least: 5.8
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 3.0.6
+Stable tag: 3.1.0
 License: GPLv2 or later
 
 Traduce automáticamente tu contenido con la API de Google Cloud Translation, publícalo en dominio.com/{idioma}/ y sigue buenas prácticas de SEO multilenguaje.
@@ -44,11 +44,37 @@ Este plugin:
 == Notas importantes ==
 
 * La traducción se ejecuta en segundo plano vía WP-Cron. En sitios con poco tráfico, considera configurar un cron real del servidor apuntando a wp-cron.php para que se ejecute puntualmente.
-* Este plugin traduce el contenido de posts/páginas (título, cuerpo, excerpt). No traduce automáticamente textos fijos del tema (menús, botones, widgets); para eso necesitarías además internacionalizar el tema con .po/.mo o usar un plugin de traducción de interfaz.
+* Este plugin traduce el contenido de posts/páginas (título, cuerpo, excerpt) y las etiquetas de los menús de navegación ("Traducción Multilenguaje → Menús"). No traduce otros textos fijos del tema (botones, widgets); para eso necesitarías internacionalizar el tema con .po/.mo o usar un plugin de traducción de interfaz.
 * Los shortcodes se protegen automáticamente antes de enviarse a traducir para no romper su sintaxis, pero revisa el resultado en contenido con HTML complejo.
 * La API de Google Cloud Translation es de pago por volumen de caracteres; revisa la cuota y el costo en tu consola de Google Cloud.
 
 == Changelog ==
+
+= 3.1.0 =
+* **Traducción de las etiquetas de los menús.** Nueva pantalla "Traducción
+  Multilenguaje → Menús": lista cada opción de cada menú con un campo por
+  idioma para el texto visible, el atributo `title` (tooltip) y la descripción.
+  Cubre enlaces personalizados, etiquetas editadas a mano y opciones que
+  apuntan a contenido sin traducir — lo que antes no se traducía. Botón
+  "Rellenar vacíos con Google" y traducción automática al guardar un menú si
+  "Traducir automáticamente" está activo. Almacenamiento propio
+  (`mls_menu_translations`); el menú original no se toca. Se aplica solo en las
+  URLs `/idioma/`.
+* **El editor manual de traducciones ya no aplana la estructura.** Antes, editar
+  a mano una traducción clásica o de Gutenberg pasaba el contenido por un
+  modelo de bloques simplificado y al reconstruir se perdían los contenedores,
+  las clases y las alineaciones (`alignwide`, `has-text-align-center`,
+  columnas, grupos, estilos de botón…); en Gutenberg además quedaba markup de
+  bloques inválido. Ahora se edita unidad-por-unidad y se reinyecta cada texto
+  sobre la estructura original con el adaptador correspondiente
+  (`serialize_blocks()` para Gutenberg, DOM para clásico), conservando el 100 %
+  del marcado. Elementor ya funcionaba así.
+  Nota: el selector de "cambiar imagen" por idioma del editor manual solo
+  queda disponible para contenido clásico/Gutenberg a través del texto
+  alternativo; el reemplazo de la imagen en sí se hace desde el editor normal.
+* El `<label>` accesible del selector de idioma usa una clase propia
+  (`.mls-language-switcher__label`) en vez de `.screen-reader-text`, para no
+  competir con la definición del tema.
 
 = 3.0.6 =
 * La caché de HTML documental de Elementor (`_elementor_element_cache`) se

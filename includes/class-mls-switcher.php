@@ -47,7 +47,7 @@ class MLS_Switcher {
 		ob_start();
 		?>
 		<div class="mls-language-switcher">
-			<label for="<?php echo esc_attr( $field_id ); ?>" class="screen-reader-text">
+			<label for="<?php echo esc_attr( $field_id ); ?>" class="mls-language-switcher__label">
 				<?php esc_html_e( 'Elegir idioma', 'mls' ); ?>
 			</label>
 			<select id="<?php echo esc_attr( $field_id ); ?>" class="mls-language-switcher-select" onchange="if(this.value){window.location.href=this.value;}">

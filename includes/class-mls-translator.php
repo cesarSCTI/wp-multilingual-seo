@@ -132,15 +132,13 @@ class MLS_Translator {
 			$excerpt = '';
 		}
 
-		$slug   = MLS_DB::generate_unique_slug( $title, $lang, $post_id );
-		$blocks = MLS_Content_Blocks::parse_html_to_blocks( $translated_content );
+		$slug = MLS_DB::generate_unique_slug( $title, $lang, $post_id );
 
 		MLS_DB::save_translation( array(
 			'post_id'           => $post_id,
 			'language'          => $lang,
 			'post_title'        => $title,
 			'post_content'      => $translated_content,
-			'content_blocks'    => wp_json_encode( $blocks ),
 			'post_excerpt'      => $excerpt,
 			'post_slug'         => $slug,
 			'translated_path'   => MLS_Url::compute_path( $post_id, $lang, $slug ),
@@ -191,15 +189,13 @@ class MLS_Translator {
 			$excerpt = '';
 		}
 
-		$slug   = MLS_DB::generate_unique_slug( $title, $lang, $post_id );
-		$blocks = MLS_Content_Blocks::parse_html_to_blocks( $translated_content );
+		$slug = MLS_DB::generate_unique_slug( $title, $lang, $post_id );
 
 		MLS_DB::save_translation( array(
 			'post_id'           => $post_id,
 			'language'          => $lang,
 			'post_title'        => $title,
 			'post_content'      => $translated_content,
-			'content_blocks'    => wp_json_encode( $blocks ),
 			'post_excerpt'      => $excerpt,
 			'post_slug'         => $slug,
 			'translated_path'   => MLS_Url::compute_path( $post_id, $lang, $slug ),
@@ -410,7 +406,7 @@ class MLS_Translator {
 	 * @param string $content
 	 * @return array [contenido_con_marcadores, mapa]
 	 */
-	private static function protect_shortcodes( $content ) {
+	public static function protect_shortcodes( $content ) {
 		if ( ! function_exists( 'get_shortcode_regex' ) ) {
 			return array( $content, array() );
 		}
@@ -433,7 +429,7 @@ class MLS_Translator {
 	 * @param array  $shortcodes
 	 * @return string
 	 */
-	private static function restore_shortcodes( $content, $shortcodes ) {
+	public static function restore_shortcodes( $content, $shortcodes ) {
 		return empty( $shortcodes ) ? $content : strtr( $content, $shortcodes );
 	}
 }

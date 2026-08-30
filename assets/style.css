@@ -11,11 +11,16 @@
 	cursor: pointer;
 }
 
-.screen-reader-text {
+/* Etiqueta accesible solo para lectores de pantalla. Prefijada para no
+   colisionar con la .screen-reader-text del tema. */
+.mls-language-switcher__label {
 	position: absolute;
 	width: 1px;
 	height: 1px;
+	padding: 0;
+	margin: -1px;
 	overflow: hidden;
 	clip: rect(1px, 1px, 1px, 1px);
 	white-space: nowrap;
+	border: 0;
 }

@@ -376,8 +376,8 @@ class MLS_Admin {
 		$builder     = MLS_Content_Resolver::detect_builder( $post_id );
 		$is_outdated = MLS_DB::is_outdated( $translation );
 
-		$blocks = array();
 		$elementor_pairs = array();
+		$unit_pairs      = array();
 
 		if ( MLS_Content_Resolver::BUILDER_ELEMENTOR === $builder ) {
 			// Elementor no usa post_content, así que el "original" y el
@@ -421,9 +421,38 @@ class MLS_Admin {
 				);
 			}
 		} else {
-			$blocks = MLS_DB::get_blocks_for_translation( $translation );
-			if ( empty( $blocks ) ) {
-				$blocks = array( array( 'type' => 'paragraph', 'text' => '' ) );
+			// Gutenberg y clásico: se edita unidad-por-unidad sobre la
+			// estructura ORIGINAL. Al reconstruir con el adaptador (no con un
+			// modelo de bloques simplificado) se conservan wrappers, clases y
+			// alineaciones (`alignwide`, `has-text-align-center`, columnas...).
+			if ( MLS_Content_Resolver::BUILDER_GUTENBERG === $builder ) {
+				$source_units = MLS_Gutenberg_Adapter::extract_units( $post->post_content );
+			} else {
+				list( $protected_source ) = MLS_Translator::protect_shortcodes( $post->post_content );
+				$source_units             = MLS_Classic_Adapter::extract_units( $protected_source );
+			}
+
+			$translated_by_path = array();
+			if ( $translation && ! empty( $translation->translation_units ) ) {
+				$decoded = json_decode( $translation->translation_units, true );
+				if ( is_array( $decoded ) ) {
+					foreach ( $decoded as $u ) {
+						if ( ! empty( $u['path'] ) ) {
+							$translated_by_path[ $u['path'] ] = isset( $u['text'] ) ? $u['text'] : '';
+						}
+					}
+				}
+			}
+
+			foreach ( $source_units as $su ) {
+				$u_type = isset( $su['type'] ) ? $su['type'] : 'text';
+				$unit_pairs[] = array(
+					'path'       => $su['path'],
+					'type'       => $u_type,
+					'label'      => $this->humanize_unit_path( $su['path'], $u_type ),
+					'original'   => $su['text'],
+					'translated' => isset( $translated_by_path[ $su['path'] ] ) ? $translated_by_path[ $su['path'] ] : '',
+				);
 			}
 		}
 
@@ -508,78 +537,24 @@ class MLS_Admin {
 						) );
 					endforeach; ?>
 				<?php else : ?>
-					<?php
-					$original_content_blocks = MLS_Content_Blocks::parse_html_to_blocks( $post->post_content );
-					foreach ( $blocks as $i => $block ) :
-						$type     = isset( $block['type'] ) ? $block['type'] : 'paragraph';
-						$original = isset( $original_content_blocks[ $i ] ) ? $original_content_blocks[ $i ] : null;
-
-						$type_labels = array(
-							'heading'    => __( 'Encabezado', 'mls' ),
-							'paragraph'  => __( 'Párrafo', 'mls' ),
-							'blockquote' => __( 'Cita', 'mls' ),
-							'image'      => __( 'Imagen', 'mls' ),
-							'list_item'  => __( 'Elemento de lista', 'mls' ),
-							'raw'        => __( 'HTML sin clasificar', 'mls' ),
-						);
-						$unit_label = isset( $type_labels[ $type ] ) ? $type_labels[ $type ] : __( 'Texto', 'mls' );
-						if ( 'heading' === $type ) {
-							/* translators: %d: nivel de encabezado */
-							$unit_label = sprintf( __( 'Encabezado H%d', 'mls' ), (int) $block['level'] );
-						}
-
-						$original_html = '';
-						$original_is_image = false;
-						$original_image_src = '';
-						if ( $original ) {
-							if ( 'image' === $original['type'] && ! empty( $original['src'] ) ) {
-								$original_is_image  = true;
-								$original_image_src = $original['src'];
-							} elseif ( isset( $original['text'] ) ) {
-								$original_html = wp_kses_post( $original['text'] );
-							} elseif ( isset( $original['html'] ) ) {
-								$original_html = esc_html( wp_strip_all_tags( $original['html'] ) );
-							}
-						}
-
-						if ( 'heading' === $type ) {
-							$field_html = '<input type="hidden" name="blocks[' . (int) $i . '][type]" value="heading" />'
-								. '<input type="hidden" name="blocks[' . (int) $i . '][level]" value="' . esc_attr( $block['level'] ) . '" />'
-								. '<textarea class="mls-tu__textarea mls-autosize mls-tu__textarea--heading" name="blocks[' . (int) $i . '][text]" rows="1">' . esc_textarea( $block['text'] ) . '</textarea>';
-						} elseif ( 'image' === $type ) {
-							$preview = ! empty( $block['src'] )
-								? '<img src="' . esc_url( $block['src'] ) . '" alt="" class="mls-image-preview" />'
-								: '<div class="mls-image-preview mls-image-preview-empty"></div>';
-							$field_html = '<input type="hidden" name="blocks[' . (int) $i . '][type]" value="image" />'
-								. '<div class="mls-image-row">' . $preview
-								. '<input type="hidden" name="blocks[' . (int) $i . '][src]" value="' . esc_url( isset( $block['src'] ) ? $block['src'] : '' ) . '" class="mls-image-src-input" />'
-								. '<div class="mls-image-fields"><button type="button" class="mls-button mls-button--secondary mls-choose-image">' . esc_html__( 'Cambiar imagen', 'mls' ) . '</button>'
-								. '<input type="text" name="blocks[' . (int) $i . '][alt]" value="' . esc_attr( isset( $block['alt'] ) ? $block['alt'] : '' ) . '" class="mls-input" placeholder="' . esc_attr__( 'Texto alternativo', 'mls' ) . '" /></div></div>';
-						} elseif ( 'list_item' === $type ) {
-							$field_html = '<input type="hidden" name="blocks[' . (int) $i . '][type]" value="list_item" />'
-								. '<input type="hidden" name="blocks[' . (int) $i . '][list_id]" value="' . esc_attr( isset( $block['list_id'] ) ? $block['list_id'] : '' ) . '" />'
-								. '<input type="hidden" name="blocks[' . (int) $i . '][ordered]" value="' . ( ! empty( $block['ordered'] ) ? '1' : '0' ) . '" />'
-								. '<textarea class="mls-tu__textarea mls-autosize" name="blocks[' . (int) $i . '][text]" rows="2">' . esc_textarea( $block['text'] ) . '</textarea>';
-						} elseif ( 'raw' === $type ) {
-							$field_html = '<input type="hidden" name="blocks[' . (int) $i . '][type]" value="raw" />'
-								. '<textarea class="mls-tu__textarea mls-tu__textarea--code" name="blocks[' . (int) $i . '][html]" rows="4">' . esc_textarea( $block['html'] ) . '</textarea>';
-						} else {
-							$field_html = '<input type="hidden" name="blocks[' . (int) $i . '][type]" value="' . esc_attr( $type ) . '" />'
-								. '<textarea class="mls-tu__textarea mls-autosize" name="blocks[' . (int) $i . '][text]" rows="2">' . esc_textarea( $block['text'] ) . '</textarea>';
-						}
-
+					<?php if ( empty( $unit_pairs ) ) : ?>
+						<p class="description"><?php esc_html_e( 'No se detectó texto traducible en este contenido. Si acabas de editar el original, guárdalo y vuelve aquí.', 'mls' ); ?></p>
+					<?php endif; ?>
+					<?php foreach ( $unit_pairs as $i => $pair ) :
+						$is_html_unit = ( 'attr' !== $pair['type'] ) && ( $pair['original'] !== wp_strip_all_tags( $pair['original'] ) );
+						$original_out = $is_html_unit ? wp_kses_post( $pair['original'] ) : esc_html( $pair['original'] );
 						$this->render_translation_unit( array(
-							'label'               => $unit_label,
-							'context'             => MLS_Content_Resolver::label( $builder ),
-							'source_lang'         => $source_lang,
-							'target_lang'         => $target_lang,
-							'original_html'       => $original_html,
-							'original_is_image'   => $original_is_image,
-							'original_image_src'  => $original_image_src,
-							'field_html'          => $field_html,
+							'label'         => $pair['label'],
+							'context'       => MLS_Content_Resolver::label( $builder ),
+							'technical'     => $pair['path'],
+							'source_lang'   => $source_lang,
+							'target_lang'   => $target_lang,
+							'original_html' => $original_out,
+							'field_html'    => '<input type="hidden" name="units[' . (int) $i . '][path]" value="' . esc_attr( $pair['path'] ) . '" />'
+								. '<input type="hidden" name="units[' . (int) $i . '][type]" value="' . esc_attr( $pair['type'] ) . '" />'
+								. '<textarea class="mls-tu__textarea mls-autosize" name="units[' . (int) $i . '][text]" rows="2">' . esc_textarea( $pair['translated'] ) . '</textarea>',
 						) );
-					endforeach;
-					?>
+					endforeach; ?>
 				<?php endif; ?>
 
 				<?php
@@ -685,6 +660,32 @@ class MLS_Admin {
 	}
 
 	/**
+	 * Etiqueta legible para una unidad de contenido clásico/Gutenberg a
+	 * partir de su ruta técnica (`0.1.attrs.content`, `0.3.attr:alt`...).
+	 *
+	 * @param string $path
+	 * @param string $type 'text' | 'html' | 'attr'
+	 * @return string
+	 */
+	private function humanize_unit_path( $path, $type ) {
+		if ( preg_match( '/\.attrs?\.?:?([a-z_-]+)$/i', $path, $m ) ) {
+			$key = strtolower( $m[1] );
+			$map = array(
+				'alt'         => __( 'Texto alternativo', 'mls' ),
+				'title'       => __( 'Título (tooltip)', 'mls' ),
+				'placeholder' => __( 'Placeholder', 'mls' ),
+				'content'     => __( 'Contenido', 'mls' ),
+				'text'        => __( 'Texto', 'mls' ),
+				'value'       => __( 'Valor', 'mls' ),
+				'caption'     => __( 'Leyenda', 'mls' ),
+				'citation'    => __( 'Cita', 'mls' ),
+			);
+			return isset( $map[ $key ] ) ? $map[ $key ] : ucfirst( str_replace( array( '_', '-' ), ' ', $key ) );
+		}
+		return 'attr' === $type ? __( 'Atributo', 'mls' ) : __( 'Texto', 'mls' );
+	}
+
+	/**
 	 * Convierte una clave técnica de Elementor (ej. "button_text",
 	 * "tab_title") en una etiqueta legible para el editor.
 	 */
@@ -733,6 +734,11 @@ class MLS_Admin {
 			wp_die( esc_html__( 'Datos incompletos.', 'mls' ) );
 		}
 
+		$post = get_post( $post_id );
+		if ( ! $post ) {
+			wp_die( esc_html__( 'El post no existe.', 'mls' ) );
+		}
+
 		$title = isset( $_POST['post_title'] ) ? sanitize_text_field( wp_unslash( $_POST['post_title'] ) ) : '';
 
 		// Slug independiente del título (sección 23): si el admin escribió
@@ -779,9 +785,42 @@ class MLS_Admin {
 			MLS_DB::save_translation( $row );
 			MLS_Elementor_Adapter::clear_elementor_render_cache();
 		} else {
-			$clean_blocks          = $this->sanitize_submitted_blocks( isset( $_POST['blocks'] ) && is_array( $_POST['blocks'] ) ? wp_unslash( $_POST['blocks'] ) : array() );
-			$row['post_content']   = MLS_Content_Blocks::blocks_to_html( $clean_blocks );
-			$row['content_blocks'] = wp_json_encode( $clean_blocks );
+			// Gutenberg y clásico: se reinyecta cada unidad traducida sobre la
+			// estructura ORIGINAL con el adaptador correspondiente. Así el HTML
+			// resultante conserva wrappers, clases y alineaciones intactos
+			// (a diferencia del antiguo modelo de bloques simplificado).
+			$raw_units   = isset( $_POST['units'] ) && is_array( $_POST['units'] ) ? wp_unslash( $_POST['units'] ) : array();
+			$clean_units = array();
+			foreach ( $raw_units as $u ) {
+				if ( ! isset( $u['path'] ) || '' === (string) $u['path'] ) {
+					continue;
+				}
+				$u_type = ( isset( $u['type'] ) && in_array( $u['type'], array( 'attr', 'html', 'text' ), true ) ) ? $u['type'] : 'text';
+				$text   = isset( $u['text'] ) ? $u['text'] : '';
+				$clean_units[] = array(
+					'path' => sanitize_text_field( $u['path'] ),
+					'type' => $u_type,
+					'text' => 'attr' === $u_type ? sanitize_text_field( $text ) : wp_kses_post( $text ),
+				);
+			}
+
+			if ( MLS_Content_Resolver::BUILDER_GUTENBERG === $builder ) {
+				$new_content = MLS_Gutenberg_Adapter::apply_translations( $post->post_content, $clean_units );
+				if ( function_exists( 'parse_blocks' ) ) {
+					$reparsed = parse_blocks( $new_content );
+					if ( empty( $reparsed ) ) {
+						wp_die( esc_html__( 'El contenido Gutenberg traducido no se pudo reconstruir de forma válida. No se guardó nada.', 'mls' ) );
+					}
+				}
+			} else {
+				list( $protected, $shortcodes ) = MLS_Translator::protect_shortcodes( $post->post_content );
+				$new_content = MLS_Classic_Adapter::apply_translations( $protected, $clean_units );
+				$new_content = MLS_Translator::restore_shortcodes( $new_content, $shortcodes );
+			}
+
+			$row['post_content']      = $new_content;
+			$row['content_blocks']    = '';
+			$row['translation_units'] = wp_json_encode( $clean_units );
 
 			MLS_DB::save_translation( $row );
 		}
@@ -791,48 +830,6 @@ class MLS_Admin {
 			admin_url( 'admin.php' )
 		) );
 		exit;
-	}
-
-	/**
-	 * Valida y limpia los bloques enviados desde el formulario según su
-	 * tipo, antes de reconstruir el HTML y guardarlos.
-	 */
-	private function sanitize_submitted_blocks( array $raw_blocks ) {
-		$allowed_types = array( 'heading', 'paragraph', 'blockquote', 'image', 'list_item', 'raw' );
-		$clean         = array();
-
-		foreach ( $raw_blocks as $b ) {
-			$type  = ( isset( $b['type'] ) && in_array( $b['type'], $allowed_types, true ) ) ? $b['type'] : 'paragraph';
-			$block = array( 'type' => $type );
-
-			switch ( $type ) {
-				case 'heading':
-					$block['level'] = isset( $b['level'] ) ? max( 1, min( 6, (int) $b['level'] ) ) : 2;
-					$block['text']  = sanitize_text_field( isset( $b['text'] ) ? $b['text'] : '' );
-					break;
-				case 'image':
-					$block['src'] = isset( $b['src'] ) ? esc_url_raw( $b['src'] ) : '';
-					$block['alt'] = sanitize_text_field( isset( $b['alt'] ) ? $b['alt'] : '' );
-					break;
-				case 'list_item':
-					$block['list_id'] = isset( $b['list_id'] ) ? sanitize_key( $b['list_id'] ) : 'list_0';
-					$block['ordered'] = ! empty( $b['ordered'] );
-					$block['text']    = wp_kses_post( isset( $b['text'] ) ? $b['text'] : '' );
-					break;
-				case 'raw':
-					$block['html'] = wp_kses_post( isset( $b['html'] ) ? $b['html'] : '' );
-					break;
-				case 'blockquote':
-				case 'paragraph':
-				default:
-					$block['text'] = wp_kses_post( isset( $b['text'] ) ? $b['text'] : '' );
-					break;
-			}
-
-			$clean[] = $block;
-		}
-
-		return $clean;
 	}
 
 	/**

@@ -92,6 +92,23 @@ class MLS_Activator {
 			KEY lang_key (language, meta_key(150))
 		) {$charset_collate};";
 
+		$menu_table = $wpdb->prefix . 'mls_menu_translations';
+		$sql_menu   = "CREATE TABLE {$menu_table} (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			menu_item_id bigint(20) unsigned NOT NULL,
+			language varchar(10) NOT NULL,
+			title text NULL,
+			attr_title text NULL,
+			description text NULL,
+			status varchar(20) NOT NULL DEFAULT 'manual',
+			source_hash varchar(64) NULL,
+			created_at datetime NOT NULL,
+			updated_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY item_lang (menu_item_id, language),
+			KEY lang_status (language, status)
+		) {$charset_collate};";
+
 		$term_table = $wpdb->prefix . 'mls_term_translations';
 		$sql_term   = "CREATE TABLE {$term_table} (
 			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -114,6 +131,7 @@ class MLS_Activator {
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $sql );
 		dbDelta( $sql_meta );
+		dbDelta( $sql_menu );
 		dbDelta( $sql_term );
 
 		self::migrate_data();

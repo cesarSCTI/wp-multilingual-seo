@@ -3,7 +3,7 @@
  * Plugin Name:       Multilingual SEO Translator (Google API)
  * Plugin URI:        https://example.com
  * Description:       Traduce automáticamente tus contenidos usando la API de Google Cloud Translation, genera URLs por idioma (dominio.com/en/, dominio.com/fr/...), redirige visitantes según el idioma del navegador y sigue buenas prácticas de SEO multilenguaje (hreflang, canonical, sitemap por idioma).
- * Version:           3.0.6
+ * Version:           3.1.0
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            Tu Sitio
@@ -32,9 +32,9 @@ if ( defined( 'MLS_VERSION' ) ) {
 	return;
 }
 
-define( 'MLS_VERSION', '3.0.6' );
+define( 'MLS_VERSION', '3.1.0' );
 define( 'MLS_ELEMENTOR_CACHE_SCHEMA_VERSION', '3' );
-define( 'MLS_DB_VERSION', '2.4.0' );
+define( 'MLS_DB_VERSION', '2.5.0' );
 define( 'MLS_PLUGIN_FILE', __FILE__ );
 define( 'MLS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'MLS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -52,6 +52,7 @@ require_once MLS_PLUGIN_DIR . 'includes/class-mls-links.php';
 require_once MLS_PLUGIN_DIR . 'includes/class-mls-registry.php';
 require_once MLS_PLUGIN_DIR . 'includes/class-mls-fields.php';
 require_once MLS_PLUGIN_DIR . 'includes/class-mls-terms.php';
+require_once MLS_PLUGIN_DIR . 'includes/class-mls-menus.php';
 require_once MLS_PLUGIN_DIR . 'includes/class-mls-woocommerce.php';
 require_once MLS_PLUGIN_DIR . 'includes/class-mls-content-blocks.php';
 require_once MLS_PLUGIN_DIR . 'includes/class-mls-classic-adapter.php';
@@ -73,6 +74,7 @@ require_once MLS_PLUGIN_DIR . 'includes/class-mls-switcher.php';
 require_once MLS_PLUGIN_DIR . 'includes/class-mls-debug.php';
 require_once MLS_PLUGIN_DIR . 'includes/class-mls-admin.php';
 require_once MLS_PLUGIN_DIR . 'includes/class-mls-admin-terms.php';
+require_once MLS_PLUGIN_DIR . 'includes/class-mls-admin-menus.php';
 
 /**
  * Activación / desactivación.
@@ -105,6 +107,7 @@ function mls_init_plugin() {
 	new MLS_Links();
 	new MLS_Fields();
 	new MLS_Terms();
+	new MLS_Menus();
 	new MLS_Queue();
 
 	// Los campos/recursos traducibles de serie + el hook para terceros.
@@ -125,6 +128,7 @@ function mls_init_plugin() {
 	if ( is_admin() ) {
 		new MLS_Admin();
 		new MLS_Admin_Terms();
+		new MLS_Admin_Menus();
 	}
 
 	add_action( 'wp_enqueue_scripts', function () {
@@ -150,6 +154,11 @@ function mls_cleanup_translations_on_delete( $post_id ) {
 	}
 	if ( class_exists( 'MLS_Fields' ) ) {
 		MLS_Fields::delete_for_post( $post_id );
+	}
+	// Los ítems de menú son posts de tipo `nav_menu_item`: al borrar uno se
+	// limpian también sus etiquetas traducidas.
+	if ( class_exists( 'MLS_Menus' ) && 'nav_menu_item' === get_post_type( $post_id ) ) {
+		MLS_Menus::delete_for_item( $post_id );
 	}
 }
 add_action( 'plugins_loaded', 'mls_init_plugin' );

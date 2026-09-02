@@ -3,7 +3,7 @@
  * Plugin Name:       Multilingual SEO Translator (Google API)
  * Plugin URI:        https://example.com
  * Description:       Traduce automáticamente tus contenidos usando la API de Google Cloud Translation, genera URLs por idioma (dominio.com/en/, dominio.com/fr/...), redirige visitantes según el idioma del navegador y sigue buenas prácticas de SEO multilenguaje (hreflang, canonical, sitemap por idioma).
- * Version:           3.1.0
+ * Version:           3.2.0
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            Tu Sitio
@@ -32,7 +32,7 @@ if ( defined( 'MLS_VERSION' ) ) {
 	return;
 }
 
-define( 'MLS_VERSION', '3.1.0' );
+define( 'MLS_VERSION', '3.2.0' );
 define( 'MLS_ELEMENTOR_CACHE_SCHEMA_VERSION', '3' );
 define( 'MLS_DB_VERSION', '2.5.0' );
 define( 'MLS_PLUGIN_FILE', __FILE__ );
@@ -71,6 +71,7 @@ require_once MLS_PLUGIN_DIR . 'includes/class-mls-seo-meta.php';
 require_once MLS_PLUGIN_DIR . 'includes/class-mls-sitemap.php';
 require_once MLS_PLUGIN_DIR . 'includes/class-mls-redirect.php';
 require_once MLS_PLUGIN_DIR . 'includes/class-mls-switcher.php';
+require_once MLS_PLUGIN_DIR . 'includes/class-mls-elementor-widgets.php';
 require_once MLS_PLUGIN_DIR . 'includes/class-mls-debug.php';
 require_once MLS_PLUGIN_DIR . 'includes/class-mls-admin.php';
 require_once MLS_PLUGIN_DIR . 'includes/class-mls-admin-terms.php';
@@ -119,6 +120,7 @@ function mls_init_plugin() {
 	new MLS_Sitemap();
 	new MLS_Redirect();
 	new MLS_Switcher();
+	new MLS_Elementor_Widgets();
 	new MLS_Debug();
 
 	if ( MLS_WooCommerce::is_active() ) {
@@ -131,8 +133,11 @@ function mls_init_plugin() {
 		new MLS_Admin_Menus();
 	}
 
+	add_action( 'wp_enqueue_scripts', 'mls_register_frontend_assets', 5 );
 	add_action( 'wp_enqueue_scripts', function () {
-		wp_enqueue_style( 'mls-style', MLS_PLUGIN_URL . 'assets/style.css', array(), MLS_VERSION );
+		wp_enqueue_style( 'mls-style' );
+		wp_enqueue_style( 'mls-switcher' );
+		wp_enqueue_script( 'mls-switcher' );
 	} );
 
 	// Traducción automática al guardar/publicar contenido. El evento
@@ -142,6 +147,23 @@ function mls_init_plugin() {
 	// Integridad: al borrar definitivamente un contenido, se eliminan SOLO
 	// las filas propias del plugin para ese post. No se toca nada más.
 	add_action( 'before_delete_post', 'mls_cleanup_translations_on_delete' );
+}
+
+/**
+ * Registra (sin encolar) los assets de frontend del plugin. Se separa del
+ * encolado para que el editor de Elementor pueda reutilizar los mismos handles
+ * en su iframe de preview.
+ */
+function mls_register_frontend_assets() {
+	if ( ! wp_style_is( 'mls-style', 'registered' ) ) {
+		wp_register_style( 'mls-style', MLS_PLUGIN_URL . 'assets/style.css', array(), MLS_VERSION );
+	}
+	if ( ! wp_style_is( 'mls-switcher', 'registered' ) ) {
+		wp_register_style( 'mls-switcher', MLS_PLUGIN_URL . 'assets/switcher.css', array( 'mls-style' ), MLS_VERSION );
+	}
+	if ( ! wp_script_is( 'mls-switcher', 'registered' ) ) {
+		wp_register_script( 'mls-switcher', MLS_PLUGIN_URL . 'assets/switcher.js', array(), MLS_VERSION, true );
+	}
 }
 
 /**

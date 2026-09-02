@@ -1,0 +1,95 @@
+/**
+ * Selector de idioma (shortcode [mls_language_switcher] + widget de Elementor).
+ *
+ * Estilos base deliberadamente mínimos: el objetivo es que ganen los estilos
+ * heredados del menú de Elementor (cuando se pega su selector) y los controles
+ * de estilo propios del widget. Aquí solo va lo estructural.
+ */
+
+.mls-lang-switch {
+	display: inline-block;
+	position: relative;
+}
+
+.mls-lang-switch__list,
+.mls-lang-switch__panel {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.mls-lang-switch__item {
+	margin: 0;
+	padding: 0;
+}
+
+.mls-lang-switch__link,
+.mls-lang-switch__toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35em;
+	text-decoration: none;
+	color: inherit;
+	font: inherit;
+	line-height: 1.4;
+	cursor: pointer;
+}
+
+/* Toggle: parte de un <button>, se normaliza a "texto". */
+.mls-lang-switch__toggle {
+	background: none;
+	border: 0;
+	padding: 0;
+}
+
+.mls-lang-switch__arrow {
+	width: 0;
+	height: 0;
+	border-left: 0.3em solid transparent;
+	border-right: 0.3em solid transparent;
+	border-top: 0.35em solid currentColor;
+	transition: transform 0.15s ease;
+}
+
+.mls-lang-switch__toggle[aria-expanded="true"] .mls-lang-switch__arrow {
+	transform: rotate(180deg);
+}
+
+/* --- Layout: lista horizontal --- */
+.mls-lang-switch--horizontal .mls-lang-switch__list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75em;
+	align-items: center;
+}
+
+/* --- Layout: lista vertical --- */
+.mls-lang-switch--vertical .mls-lang-switch__list {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4em;
+}
+
+/* --- Layout: dropdown --- */
+.mls-lang-switch--dropdown .mls-lang-switch__panel {
+	position: absolute;
+	z-index: 99;
+	min-width: 100%;
+	display: flex;
+	flex-direction: column;
+	gap: 0.2em;
+	padding: 0.4em 0.6em;
+	background: #fff;
+	border: 1px solid rgba(0, 0, 0, 0.12);
+	border-radius: 4px;
+	box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+}
+
+.mls-lang-switch--dropdown .mls-lang-switch__panel[hidden] {
+	display: none;
+}
+
+.mls-lang-switch--dropdown .mls-lang-switch__link {
+	display: block;
+	white-space: nowrap;
+}

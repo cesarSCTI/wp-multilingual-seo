@@ -4,7 +4,7 @@ Tags: traducción, multilenguaje, seo, hreflang, google translate
 Requires at least: 5.8
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 3.1.0
+Stable tag: 3.2.0
 License: GPLv2 or later
 
 Traduce automáticamente tu contenido con la API de Google Cloud Translation, publícalo en dominio.com/{idioma}/ y sigue buenas prácticas de SEO multilenguaje.
@@ -20,7 +20,7 @@ Este plugin:
 5. Añade etiquetas hreflang y canonical correctas por idioma (evita contenido duplicado ante Google).
 6. Genera un sitemap XML por idioma (dominio.com/mls-sitemap-en.xml) y lo referencia en robots.txt.
 7. Opcionalmente redirige a cada visitante a la versión de idioma de su navegador (302, respetando bots/crawlers y con posibilidad de cambio manual).
-8. Incluye un shortcode [mls_language_switcher] para el selector de idioma.
+8. Incluye un selector de idioma como shortcode [mls_language_switcher] y como widget de Elementor ("Selector de idioma (MLS)").
 
 == Instalación ==
 
@@ -33,7 +33,13 @@ Este plugin:
 7. Marca "Redirect automático" si quieres redirigir visitantes según su navegador.
 8. Guarda cambios (esto regenera las URLs automáticamente; si aun así ves 404 en /en/, ve a Ajustes > Enlaces permanentes y guarda una vez).
 9. Ve a "Traducción Multilenguaje" > Traducciones para ver el estado de cada post/página y usa "Sincronizar ahora" para traducir todo lo pendiente al instante, sin depender de WP-Cron.
-10. Agrega el shortcode [mls_language_switcher] (aparece como un menú desplegable) a tu menú o widget para que los visitantes puedan cambiar de idioma.
+10. Coloca el selector de idioma para que los visitantes puedan cambiar de idioma:
+    - Con Elementor: arrastra el widget "Selector de idioma (MLS)" (categoría
+      "Multilingual SEO") donde quieras — cabecera, menú, pie…
+    - O con el shortcode [mls_language_switcher] en un widget de texto o en el
+      contenido. Atributos: display="dropdown|horizontal|vertical" (por defecto
+      dropdown), label="code|native|code_native" (por defecto code → ES/EN/PT),
+      hide_current="1", class="mi-clase".
 
 == Administración ==
 
@@ -49,6 +55,28 @@ Este plugin:
 * La API de Google Cloud Translation es de pago por volumen de caracteres; revisa la cuota y el costo en tu consola de Google Cloud.
 
 == Changelog ==
+
+= 3.2.0 =
+* **Selector de idioma como widget de Elementor.** Nuevo widget "Selector de
+  idioma (MLS)" (categoría "Multilingual SEO") que se arrastra como cualquier
+  otro elemento — pensado para colocarlo junto al menú de la cabecera. Por
+  defecto muestra la nomenclatura corta del idioma (ES, EN, PT…) y funciona
+  como desplegable; también admite lista horizontal o vertical. La etiqueta
+  puede ser el código, el nombre nativo ("Español") o ambos.
+* **Herencia de estilos del menú.** El widget renderiza con las mismas clases
+  que el widget de menú de Elementor (`elementor-item`,
+  `elementor-nav-menu--dropdown`…) y tiene un campo "Selector CSS del menú"
+  donde se pega el selector del menú ya estilado (p. ej.
+  `.elementor-element-XXXX` a partir de un CSS ID) para que el selector de
+  idioma se vea igual. Además incluye ajustes propios (tipografía, color de
+  texto / hover / idioma actual, relleno, separación, alineación y estilo del
+  panel del desplegable).
+* **El shortcode `[mls_language_switcher]` admite atributos.** `display`
+  (`dropdown` por defecto, `horizontal`, `vertical`), `label` (`code` por
+  defecto, `native`, `code_native`), `hide_current` y `class`. El marcado pasó
+  de un `<select>` nativo a un desplegable accesible propio (con `aria-expanded`,
+  cierre con Esc y clic fuera, `aria-current` en el idioma activo y `hreflang`
+  en cada enlace).
 
 = 3.1.0 =
 * **Traducción de las etiquetas de los menús.** Nueva pantalla "Traducción

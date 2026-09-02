@@ -48,7 +48,12 @@ plugins/temas.
 - Sitemap nativo `WP_Sitemaps` con subtipo por idioma; XML propio de respaldo.
 - title / meta description / Open Graph / Twitter traducidos (core, Yoast,
   Rank Math, AIOSEO).
-- Selector de idioma (`[mls_language_switcher]`).
+- Selector de idioma: shortcode `[mls_language_switcher]` (atributos `display`
+  = `dropdown`/`horizontal`/`vertical`, `label` = `code`/`native`/`code_native`,
+  `hide_current`, `class`) y widget de Elementor "Selector de idioma (MLS)"
+  (categoría "Multilingual SEO"). El widget replica las clases del menú de
+  Elementor y acepta el selector CSS del menú estilado para heredar su aspecto,
+  más ajustes propios de tipografía/color/espaciado.
 - Redirección opcional por `Accept-Language` (302, respeta bots y elección manual).
 
 ## Qué NO cubre todavía

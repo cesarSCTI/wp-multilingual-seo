@@ -31,4 +31,5 @@ require_once __DIR__ . '/../includes/class-mls-language-registry.php';
 require_once __DIR__ . '/../includes/class-mls-language-context.php';
 require_once __DIR__ . '/../includes/class-mls-url.php';
 require_once __DIR__ . '/../includes/class-mls-db.php';
+require_once __DIR__ . '/../includes/class-mls-links.php';
 require_once __DIR__ . '/../includes/class-mls-switcher.php';

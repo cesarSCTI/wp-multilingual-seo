@@ -123,10 +123,24 @@ class MLS_SEO {
 	 * sus propias anotaciones hreflang.
 	 */
 	public function output_hreflang_tags() {
+		// El hreflang del idioma fuente (y x-default) se construye con
+		// `get_permalink()`, que en una petición /en/ MLS_Links reescribiría a
+		// /en/. Se suspende esa localización mientras se generan las etiquetas
+		// para que la URL del idioma fuente sea la real.
+		$suspend = class_exists( 'MLS_Links' );
+		$prev    = $suspend ? MLS_Links::$suspended : false;
+		if ( $suspend ) {
+			MLS_Links::$suspended = true;
+		}
+
 		if ( is_singular() ) {
 			$this->output_hreflang_for_post( $this->current_post_id() );
 		} elseif ( is_front_page() || is_home() ) {
 			$this->output_hreflang_for_home();
+		}
+
+		if ( $suspend ) {
+			MLS_Links::$suspended = $prev;
 		}
 	}
 

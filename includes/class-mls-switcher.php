@@ -68,6 +68,17 @@ class MLS_Switcher {
 		$current = MLS_Language_Context::get_current_language();
 		$post_id = self::current_post_id();
 
+		// En una petición /en/, MLS_Links reescribe `get_permalink()` a /en/;
+		// sin esto, la opción del idioma fuente ("ES") apuntaría de vuelta a la
+		// página en inglés. Se suspenden esos filtros solo mientras se calculan
+		// las URLs del selector (las de los idiomas destino se construyen de
+		// forma explícita y no dependen de ellos).
+		$suspend = class_exists( 'MLS_Links' );
+		$prev    = $suspend ? MLS_Links::$suspended : false;
+		if ( $suspend ) {
+			MLS_Links::$suspended = true;
+		}
+
 		$links = array();
 		foreach ( $languages as $code => $lang ) {
 			if ( isset( $lang['active'] ) && ! $lang['active'] ) {
@@ -87,6 +98,10 @@ class MLS_Switcher {
 				'url'        => $url,
 				'is_current' => ( $code === $current ),
 			);
+		}
+
+		if ( $suspend ) {
+			MLS_Links::$suspended = $prev;
 		}
 
 		return count( $links ) < 2 ? array() : $links;

@@ -17,6 +17,18 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class MLS_Links {
 
+	/**
+	 * Suspensión temporal de TODOS los filtros de localización de enlaces.
+	 *
+	 * Lo usa el selector de idioma para obtener el permalink REAL del idioma
+	 * fuente: en una petición /en/ estos filtros reescribirían
+	 * `get_permalink()` a /en/, y entonces la opción "ES" del selector
+	 * apuntaría de vuelta a la página en inglés.
+	 *
+	 * @var bool
+	 */
+	public static $suspended = false;
+
 	public function __construct() {
 		add_filter( 'post_link', array( $this, 'localize_post_link' ), 10, 2 );
 		add_filter( 'page_link', array( $this, 'localize_page_link' ), 10, 2 );
@@ -35,7 +47,7 @@ class MLS_Links {
 	}
 
 	private function active() {
-		return ! is_admin() && MLS_Language_Context::is_translation_request();
+		return ! self::$suspended && ! is_admin() && MLS_Language_Context::is_translation_request();
 	}
 
 	/**

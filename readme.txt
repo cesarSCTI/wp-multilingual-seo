@@ -4,7 +4,7 @@ Tags: traducción, multilenguaje, seo, hreflang, google translate
 Requires at least: 5.8
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 3.2.0
+Stable tag: 3.2.1
 License: GPLv2 or later
 
 Traduce automáticamente tu contenido con la API de Google Cloud Translation, publícalo en dominio.com/{idioma}/ y sigue buenas prácticas de SEO multilenguaje.
@@ -55,6 +55,15 @@ Este plugin:
 * La API de Google Cloud Translation es de pago por volumen de caracteres; revisa la cuota y el costo en tu consola de Google Cloud.
 
 == Changelog ==
+
+= 3.2.1 =
+* **Corregido el selector de idioma en páginas traducidas.** Estando en `/en/`,
+  la opción del idioma fuente ("ES") apuntaba de vuelta a la propia página en
+  inglés (`/en/...`) en lugar de a la URL original. La causa: `get_permalink()`
+  pasa por los filtros que mantienen los enlaces dentro del idioma de la URL.
+  Ahora el selector suspende esos filtros mientras calcula sus enlaces. La
+  misma corrección se aplica a las etiquetas `hreflang` del idioma fuente y
+  `x-default` en páginas traducidas.
 
 = 3.2.0 =
 * **Selector de idioma como widget de Elementor.** Nuevo widget "Selector de
